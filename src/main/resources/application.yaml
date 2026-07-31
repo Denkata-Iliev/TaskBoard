@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: TaskBoard
+
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5432/taskboard
+    username: taskboard
+    password: password
+
+  flyway:
+    url: jdbc:postgresql://localhost:5432/taskboard
+    user: taskboard
+    password: password
