@@ -1,0 +1,2063 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Collaborative Task Board API — Project Spec</title>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --surface2: #222534;
+            --border: #2e3148;
+            --primary: #7c6af7;
+            --primary-dim: #3d3678;
+            --green: #4ade80;
+            --green-dim: #1a3a27;
+            --yellow: #fbbf24;
+            --yellow-dim: #3a2e0a;
+            --red: #f87171;
+            --red-dim: #3a1a1a;
+            --blue: #60a5fa;
+            --blue-dim: #1a2a3a;
+            --cyan: #22d3ee;
+            --text: #e2e4f0;
+            --text-dim: #8b8fa8;
+            --text-dimmer: #555870;
+            --radius: 10px;
+            --radius-sm: 6px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .page-header {
+            background: linear-gradient(135deg, #1a1d27 0%, #12111f 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 48px 0 36px;
+            text-align: center;
+        }
+
+        .page-header .badge {
+            display: inline-block;
+            background: var(--primary-dim);
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            border-radius: 20px;
+            padding: 4px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+        }
+
+        .page-header h1 {
+            font-size: 2.4rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, #fff 30%, var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .page-header p {
+            color: var(--text-dim);
+            max-width: 600px;
+            margin: 0 auto;
+            font-size: 1rem;
+        }
+
+        .phase-pills {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 28px;
+        }
+
+        .phase-pill {
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            border: 1px solid;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .phase-pill.p1 { background: var(--green-dim); color: var(--green); border-color: var(--green); }
+        .phase-pill.p2 { background: var(--blue-dim); color: var(--blue); border-color: var(--blue); }
+        .phase-pill.p3 { background: var(--yellow-dim); color: var(--yellow); border-color: var(--yellow); }
+        .phase-pill.p4 { background: var(--red-dim); color: var(--red); border-color: var(--red); }
+
+        nav.tabs {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: stretch;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            overflow-x: auto;
+        }
+
+        .tabs-buttons {
+            display: flex;
+            flex: 1;                  /* takes up all available space */
+            justify-content: center;  /* centers the buttons within that space */
+            overflow-x: auto;
+        }
+
+        nav.tabs button {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            padding: 16px 22px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            white-space: nowrap;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        nav.tabs button:hover { color: var(--text); background: var(--surface2); }
+        nav.tabs button.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+        .scroll-toggle {
+            margin-left: auto;       /* pushes it to the far right */
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0 18px;
+            cursor: pointer;
+            white-space: nowrap;
+            border-left: 1px solid var(--border);
+            transition: background 0.2s;
+            user-select: none;
+            flex-shrink: 0;          /* never gets squished when tabs overflow */
+        }
+
+        .scroll-toggle:hover { background: var(--surface2); }
+
+        .scroll-toggle-icon { font-size: 14px; }
+
+        .scroll-toggle-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-dim);
+            transition: color 0.2s;
+        }
+
+        .scroll-toggle.off .scroll-toggle-label { color: var(--text-dimmer); }
+        .scroll-toggle.off .scroll-toggle-icon { filter: grayscale(1); opacity: 0.4; }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        .section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 28px;
+            margin-bottom: 24px;
+        }
+
+        .section h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--text);
+        }
+
+        .section h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-dim);
+            margin: 20px 0 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            font-size: 12px;
+        }
+
+        /* Cards */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 14px;
+        }
+
+        .card {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+        }
+
+        .card h4 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .card p {
+            font-size: 13px;
+            color: var(--text-dim);
+            line-height: 1.5;
+        }
+
+        .card.green { border-left: 3px solid var(--green); }
+        .card.blue { border-left: 3px solid var(--blue); }
+        .card.yellow { border-left: 3px solid var(--yellow); }
+        .card.red { border-left: 3px solid var(--red); }
+        .card.purple { border-left: 3px solid var(--primary); }
+        .card.cyan { border-left: 3px solid var(--cyan); }
+
+        /* Code blocks */
+        pre {
+            background: #0a0b10;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 18px;
+            overflow-x: auto;
+            margin: 12px 0;
+            font-size: 13px;
+            line-height: 1.65;
+        }
+
+        code {
+            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+        }
+
+        p code, li code {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 1px 6px;
+            font-size: 13px;
+            color: var(--cyan);
+        }
+
+        .kw { color: #c792ea; }
+        .fn { color: #82aaff; }
+        .ty { color: #ffcb6b; }
+        .st { color: #c3e88d; }
+        .cm { color: #546e7a; font-style: italic; }
+        .an { color: #f78c6c; }
+        .nu { color: #f78c6c; }
+
+        /* Endpoints */
+        .endpoint-group { margin-bottom: 20px; }
+        .endpoint-group h4 {
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-dim);
+            margin-bottom: 8px;
+        }
+
+        .endpoint {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 14px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            margin-bottom: 6px;
+            flex-wrap: wrap;
+        }
+
+        .method {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            min-width: 56px;
+            text-align: center;
+            font-family: monospace;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .method.GET    { background: #1a3a27; color: #4ade80; }
+        .method.POST   { background: #1a2a3a; color: #60a5fa; }
+        .method.PUT    { background: #3a2e0a; color: #fbbf24; }
+        .method.PATCH  { background: #2a1a3a; color: #a78bfa; }
+        .method.DELETE { background: #3a1a1a; color: #f87171; }
+
+        .endpoint-path {
+            font-family: monospace;
+            font-size: 13px;
+            color: var(--text);
+            flex: 1;
+        }
+
+        .endpoint-path .param { color: var(--primary); }
+
+        .endpoint-note {
+            font-size: 12px;
+            color: var(--text-dim);
+            width: 100%;
+            padding-left: 66px;
+            margin-top: 2px;
+        }
+
+        .role-badge {
+            font-size: 11px;
+            padding: 1px 7px;
+            border-radius: 4px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .role-badge.owner  { background: var(--red-dim); color: var(--red); }
+        .role-badge.member { background: var(--blue-dim); color: var(--blue); }
+        .role-badge.viewer { background: var(--surface2); color: var(--text-dim); border: 1px solid var(--border); }
+        .role-badge.auth   { background: var(--green-dim); color: var(--green); }
+
+        /* Steps */
+        .steps { counter-reset: step; }
+
+        .step {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 14px;
+            align-items: flex-start;
+        }
+
+        .step-num {
+            counter-increment: step;
+            content: counter(step);
+            background: var(--primary-dim);
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .step-body h4 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .step-body p {
+            font-size: 13px;
+            color: var(--text-dim);
+            line-height: 1.55;
+        }
+
+        /* Tips, warnings, notes */
+        .callout {
+            display: flex;
+            gap: 12px;
+            padding: 14px 16px;
+            border-radius: var(--radius-sm);
+            margin: 14px 0;
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .callout .icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+        .callout.tip  { background: var(--green-dim); border: 1px solid #2a5a3a; color: #a7f3c0; }
+        .callout.warn { background: var(--yellow-dim); border: 1px solid #5a4a1a; color: #fde68a; }
+        .callout.info { background: var(--blue-dim); border: 1px solid #1a3a5a; color: #bfdbfe; }
+        .callout.danger { background: var(--red-dim); border: 1px solid #5a2a2a; color: #fecaca; }
+
+        /* Resources */
+        .resource-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+
+        .resource-list li {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px 14px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+        }
+
+        .resource-list .icon { font-size: 18px; flex-shrink: 0; }
+
+        .resource-list a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .resource-list a:hover { text-decoration: underline; }
+
+        .resource-list .meta {
+            font-size: 12px;
+            color: var(--text-dim);
+            margin-top: 2px;
+        }
+
+        .resource-list .phase-tag {
+            font-size: 11px;
+            padding: 1px 7px;
+            border-radius: 4px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        .resource-list .phase-tag.p1 { background: var(--green-dim); color: var(--green); }
+        .resource-list .phase-tag.p2 { background: var(--blue-dim); color: var(--blue); }
+        .resource-list .phase-tag.p3 { background: var(--yellow-dim); color: var(--yellow); }
+        .resource-list .phase-tag.p4 { background: var(--red-dim); color: var(--red); }
+
+        /* Domain diagram */
+        .domain-diagram {
+            background: #0a0b10;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 20px;
+            font-family: monospace;
+            font-size: 13px;
+            color: var(--text-dim);
+            line-height: 1.8;
+            overflow-x: auto;
+        }
+
+        .domain-diagram .entity { color: var(--yellow); font-weight: bold; }
+        .domain-diagram .rel { color: var(--primary); }
+        .domain-diagram .field { color: var(--cyan); }
+        .domain-diagram .comment { color: #546e7a; }
+
+        /* Phase header */
+        .phase-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+
+        .phase-number {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .phase-number.p1 { background: var(--green-dim); color: var(--green); border: 1px solid var(--green); }
+        .phase-number.p2 { background: var(--blue-dim); color: var(--blue); border: 1px solid var(--blue); }
+        .phase-number.p3 { background: var(--yellow-dim); color: var(--yellow); border: 1px solid var(--yellow); }
+        .phase-number.p4 { background: var(--red-dim); color: var(--red); border: 1px solid var(--red); }
+
+        .phase-header-text h2 { margin-bottom: 2px; font-size: 1.2rem; }
+        .phase-header-text p { font-size: 13px; color: var(--text-dim); }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th {
+            text-align: left;
+            padding: 10px 14px;
+            background: var(--surface2);
+            color: var(--text-dim);
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+            color: var(--text);
+        }
+
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: var(--surface2); }
+
+        /* Role table */
+        .check { color: var(--green); }
+        .cross { color: var(--red-dim); color: #555; }
+
+        ul, ol {
+            padding-left: 20px;
+            color: var(--text-dim);
+            font-size: 14px;
+        }
+
+        ul li, ol li { margin-bottom: 6px; line-height: 1.55; }
+
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        @media (max-width: 700px) {
+            .two-col { grid-template-columns: 1fr; }
+            .page-header h1 { font-size: 1.6rem; }
+        }
+
+        hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+    </style>
+</head>
+<body>
+
+<header class="page-header">
+    <div class="badge">Intermediate → Advanced · Kotlin + Spring Boot</div>
+    <h1>🗂️ Collaborative Task Board API</h1>
+    <p>A Jira/Linear-inspired backend built with Kotlin, Spring WebFlux, Coroutines, and R2DBC. Real auth, real domain logic, real-time events.</p>
+    <div class="phase-pills">
+        <span class="phase-pill p1">Phase 1 · Core API</span>
+        <span class="phase-pill p2">Phase 2 · Real-Time</span>
+        <span class="phase-pill p3">Phase 3 · Filters & Labels</span>
+        <span class="phase-pill p4">Phase 4 · Redis</span>
+    </div>
+</header>
+
+<nav class="tabs">
+    <div class="tabs-buttons">
+        <button class="active" onclick="showTab('overview', this)">📋 Overview</button>
+        <button onclick="showTab('domain', this)">🗃️ Domain</button>
+        <button onclick="showTab('endpoints', this)">🔌 Endpoints</button>
+        <button onclick="showTab('phases', this)">🚀 Phases</button>
+        <button onclick="showTab('concepts', this)">🧠 Key Concepts</button>
+        <button onclick="showTab('testing', this)">🧪 Testing</button>
+        <button onclick="showTab('resources', this)">📚 Resources</button>
+    </div>
+    <div class="scroll-toggle" onclick="toggleScroll()">
+        <span class="scroll-toggle-icon">⬆️</span>
+        <span class="scroll-toggle-label" id="scrollLabel">Scroll to top: ON</span>
+    </div>
+</nav>
+
+<div class="container">
+
+    <!-- OVERVIEW -->
+    <div id="tab-overview" class="tab-panel active">
+
+        <div class="section">
+            <h2>🎯 What You're Building</h2>
+            <p style="color: var(--text-dim); margin-bottom: 16px;">
+                A REST API backend for a collaborative task board. Think of it as a simplified Linear or Jira. Users belong to workspaces, workspaces have boards, boards have columns, columns have tasks. 
+                Permissions are scoped per workspace. Eventually, the board updates in real-time via Server-Sent Events.
+            </p>
+            <div class="callout info">
+                <span class="icon">💡</span>
+                <span>The goal is NOT to build a production app. The goal is to touch every part of the Kotlin + Spring Boot stack in a project that actually has a reason to use each feature, not just a fake CRUD exercise.</span>
+            </div>
+        </div>
+
+        <div class="section">
+    <h2>🗺️ The Big Picture</h2>
+    <div class="domain-diagram"><pre style="background:transparent; border:none; padding:0; margin:0;"><span class="entity">Workspace</span>  <span class="comment">← top-level container, like a Slack workspace</span>
+    <span class="rel">│</span>
+    <span class="rel">├──</span> <span class="entity">WorkspaceMembership</span>  <span class="comment">← User + Workspace + Role (OWNER / MEMBER / VIEWER)</span>
+    <span class="rel">│</span>
+    <span class="rel">└──</span> <span class="entity">Board</span>  <span class="comment">← a board lives inside a workspace</span>
+          <span class="rel">│</span>
+          <span class="rel">└──</span> <span class="entity">Column</span>  <span class="comment">← Backlog / In Progress / Done / custom</span>
+                <span class="rel">│</span>
+                <span class="rel">└──</span> <span class="entity">Task</span>  <span class="comment">← the actual work item</span>
+                      <span class="rel">├──</span> <span class="field">assignee</span>   <span class="rel">→</span> <span class="entity">User</span>
+                      <span class="rel">├──</span> <span class="field">comments</span>   <span class="rel">→</span> <span class="entity">Comment</span>[]
+                      <span class="rel">├──</span> <span class="field">labels</span>     <span class="rel">→</span> <span class="entity">Label</span>[]  <span class="comment">(Phase 3)</span>
+                      <span class="rel">└──</span> <span class="field">activity</span>   <span class="rel">→</span> <span class="entity">ActivityEvent</span>[]  <span class="comment">(Phase 2)</span></pre></div>
+</div>
+
+        <div class="section">
+            <h2>📦 Tech Stack</h2>
+            <div class="card-grid">
+                <div class="card purple">
+                    <h4>Kotlin + Coroutines</h4>
+                    <p>The whole thing is written idiomatically in Kotlin. <code>suspend</code> functions everywhere, no Reactor types directly.</p>
+                </div>
+                <div class="card green">
+                    <h4>Spring WebFlux</h4>
+                    <p>Reactive web framework. Replaces Spring MVC. Needed for coroutine-native controllers and SSE support.</p>
+                </div>
+                <div class="card blue">
+                    <h4>Spring Data R2DBC</h4>
+                    <p>Non-blocking database access. Like JPA but designed for coroutines. Uses PostgreSQL.</p>
+                </div>
+                <div class="card yellow">
+                    <h4>Spring Security (Reactive)</h4>
+                    <p>JWT authentication. Workspace-scoped authorization. A custom <code>@PreAuthorize</code> component.</p>
+                </div>
+                <div class="card cyan">
+                    <h4>SharedFlow → Redis (later)</h4>
+                    <p>Start with in-memory <code>SharedFlow</code> for pub/sub. Swap to Redis in Phase 4 to understand what problem it solves.</p>
+                </div>
+                <div class="card red">
+                    <h4>Flyway + PostgreSQL</h4>
+                    <p>DB migrations like you've done before. Same concept, slightly different setup with R2DBC.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>⏱️ Estimated Timeline</h2>
+            <table>
+                <thead>
+                    <tr><th>Phase</th><th>Focus</th><th>Estimate</th><th>Hard Part</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="role-badge" style="background:var(--green-dim);color:var(--green);">Phase 1</span></td>
+                        <td>Core API, Auth, Roles</td>
+                        <td>2–3 weeks</td>
+                        <td>Reactive Security Config, R2DBC quirks</td>
+                    </tr>
+                    <tr>
+                        <td><span class="role-badge" style="background:var(--blue-dim);color:var(--blue);">Phase 2</span></td>
+                        <td>Activity Log, SSE, SharedFlow</td>
+                        <td>1–2 weeks</td>
+                        <td>Understanding Flow vs SSE vs WebSocket</td>
+                    </tr>
+                    <tr>
+                        <td><span class="role-badge" style="background:var(--yellow-dim);color:var(--yellow);">Phase 3</span></td>
+                        <td>Labels, Filters, Search</td>
+                        <td>1 week</td>
+                        <td>Many-to-many in R2DBC (more manual than JPA)</td>
+                    </tr>
+                    <tr>
+                        <td><span class="role-badge" style="background:var(--red-dim);color:var(--red);">Phase 4</span></td>
+                        <td>Redis Pub/Sub + Caching</td>
+                        <td>1 week</td>
+                        <td>Reactive Redis client setup</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="callout tip" style="margin-top:14px;">
+                <span class="icon">✅</span>
+                <span><strong>One brick at a time.</strong> When you start, forget Phases 2, 3, and 4 exist. Your only goal in week 1 is: app starts, connects to a database, and a user can register.</span>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🏗️ Project Structure</h2>
+<pre><code>src/main/kotlin/com/yourname/taskboard/
+<span class="kw">├──</span> auth/
+<span class="kw">│   ├──</span> AuthController.kt
+<span class="kw">│   ├──</span> AuthService.kt
+<span class="kw">│   ├──</span> JwtService.kt
+<span class="kw">│   └──</span> JwtAuthFilter.kt
+<span class="kw">├──</span> config/
+<span class="kw">│   ├──</span> SecurityConfig.kt
+<span class="kw">│   └──</span> CorsConfig.kt
+<span class="kw">├──</span> workspace/
+<span class="kw">│   ├──</span> WorkspaceController.kt
+<span class="kw">│   ├──</span> WorkspaceService.kt
+<span class="kw">│   ├──</span> WorkspaceRepository.kt
+<span class="kw">│   └──</span> Workspace.kt          <span class="cm">// entity + DTOs in same package</span>
+<span class="kw">├──</span> board/
+<span class="kw">│   ├──</span> BoardController.kt
+<span class="kw">│   ├──</span> BoardService.kt
+<span class="kw">│   ├──</span> BoardRepository.kt
+<span class="kw">│   └──</span> Board.kt
+<span class="kw">├──</span> task/
+<span class="kw">│   ├──</span> TaskController.kt
+<span class="kw">│   ├──</span> TaskService.kt
+<span class="kw">│   ├──</span> TaskRepository.kt
+<span class="kw">│   └──</span> Task.kt
+<span class="kw">├──</span> comment/
+<span class="kw">├──</span> membership/
+<span class="kw">├──</span> events/                   <span class="cm">// Phase 2</span>
+<span class="kw">│   ├──</span> BoardEventBus.kt
+<span class="kw">│   ├──</span> BoardEvent.kt         <span class="cm">// sealed class</span>
+<span class="kw">│   └──</span> ActivityEvent.kt
+<span class="kw">├──</span> label/                    <span class="cm">// Phase 3</span>
+<span class="kw">└──</span> shared/
+    <span class="kw">├──</span> exception/
+    <span class="kw">│   ├──</span> GlobalExceptionHandler.kt
+    <span class="kw">│   └──</span> AppExceptions.kt
+    <span class="kw">└──</span> security/
+        └── WorkspaceAuthorizationService.kt</code></pre>
+            <div class="callout info">
+                <span class="icon">📁</span>
+                <span>Organize by <strong>feature</strong>, not by layer. Don't make a <code>controllers/</code> folder with all controllers in it. Keep the controller, service, repository, and entity for each feature together. This is standard Kotlin/Spring practice.</span>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📦 Dependencies (Spring Initializr)</h2>
+            <p style="color:var(--text-dim); margin-bottom: 14px;">Go to <a href="https://start.spring.io" style="color:var(--primary);" target="_blank">start.spring.io</a> and select:</p>
+            <ul>
+                <li><strong>Language:</strong> Kotlin</li>
+                <li><strong>Build:</strong> Gradle - Kotlin DSL</li>
+                <li><strong>Spring Boot:</strong> latest stable</li>
+            </ul>
+            <br>
+            <p style="color:var(--text-dim); margin-bottom: 10px;"><strong>Dependencies to add:</strong></p>
+            <table>
+                <thead><tr><th>Dependency</th><th>Why</th></tr></thead>
+                <tbody>
+                    <tr><td><code>Spring Reactive Web</code></td><td>WebFlux — the reactive web framework</td></tr>
+                    <tr><td><code>Spring Data R2DBC</code></td><td>Reactive database access</td></tr>
+                    <tr><td><code>PostgreSQL Driver</code></td><td>Database driver</td></tr>
+                    <tr><td><code>R2DBC PostgreSQL</code></td><td>Reactive PostgreSQL driver</td></tr>
+                    <tr><td><code>Spring Security</code></td><td>Auth framework</td></tr>
+                    <tr><td><code>Flyway Migration</code></td><td>DB migrations — same as you've done</td></tr>
+                    <tr><td><code>Validation</code></td><td>Request body validation (<code>@Valid</code>, <code>@NotNull</code>, etc.)</td></tr>
+                </tbody>
+            </table>
+            <br>
+            <p style="color:var(--text-dim); margin-bottom: 10px;"><strong>Add manually to <code>build.gradle.kts</code>:</strong></p>
+<pre><code><span class="cm">// JWT</span>
+implementation(<span class="st">"io.jsonwebtoken:jjwt-api:0.12.5"</span>)
+runtimeOnly(<span class="st">"io.jsonwebtoken:jjwt-impl:0.12.5"</span>)
+runtimeOnly(<span class="st">"io.jsonwebtoken:jjwt-jackson:0.12.5"</span>)
+
+<span class="cm">// Testing</span>
+testImplementation(<span class="st">"io.mockk:mockk:1.13.10"</span>)
+testImplementation(<span class="st">"app.cash.turbine:turbine:1.1.0"</span>) <span class="cm">// for testing Flows</span>
+testImplementation(<span class="st">"org.testcontainers:postgresql:1.19.7"</span>)
+testImplementation(<span class="st">"org.testcontainers:r2dbc:1.19.7"</span>)</code></pre>
+        </div>
+
+    </div>
+
+    <!-- DOMAIN -->
+    <div id="tab-domain" class="tab-panel">
+
+        <div class="section">
+            <h2>🗃️ Entities</h2>
+
+            <div class="callout info">
+                <span class="icon">💡</span>
+                <span>R2DBC entities look similar to JPA but there are key differences: <strong>no lazy loading</strong>, <strong>no <code>@OneToMany</code> / <code>@ManyToOne</code></strong> annotations, and <strong>no cascading</strong>. Relationships are handled manually in services. This is a feature, not a bug — it forces you to be explicit.</span>
+            </div>
+
+            <h3>User</h3>
+<pre><code><span class="an">@Table("users")</span>
+<span class="kw">data class</span> <span class="ty">User</span>(
+    <span class="an">@Id</span> <span class="kw">val</span> id: <span class="ty">UUID</span> = <span class="ty">UUID</span>.randomUUID(),
+    <span class="kw">val</span> email: <span class="ty">String</span>,
+    <span class="kw">val</span> passwordHash: <span class="ty">String</span>,
+    <span class="kw">val</span> displayName: <span class="ty">String</span>,
+    <span class="kw">val</span> createdAt: <span class="ty">Instant</span> = <span class="ty">Instant</span>.now()
+)
+
+<span class="cm">// Never expose passwordHash in responses. Use a response DTO.</span>
+<span class="kw">data class</span> <span class="ty">UserResponse</span>(<span class="kw">val</span> id: <span class="ty">UUID</span>, <span class="kw">val</span> email: <span class="ty">String</span>, <span class="kw">val</span> displayName: <span class="ty">String</span>)</code></pre>
+
+            <h3>Workspace</h3>
+<pre><code><span class="an">@Table("workspaces")</span>
+<span class="kw">data class</span> <span class="ty">Workspace</span>(
+    <span class="an">@Id</span> <span class="kw">val</span> id: <span class="ty">UUID</span> = <span class="ty">UUID</span>.randomUUID(),
+    <span class="kw">val</span> name: <span class="ty">String</span>,
+    <span class="kw">val</span> createdBy: <span class="ty">UUID</span>,    <span class="cm">// User.id — just the ID, not the whole User object</span>
+    <span class="kw">val</span> createdAt: <span class="ty">Instant</span> = <span class="ty">Instant</span>.now()
+)</code></pre>
+
+            <h3>WorkspaceMembership</h3>
+<pre><code><span class="kw">enum class</span> <span class="ty">WorkspaceRole</span> { OWNER, MEMBER, VIEWER }
+
+<span class="an">@Table("workspace_memberships")</span>
+<span class="kw">data class</span> <span class="ty">WorkspaceMembership</span>(
+    <span class="an">@Id</span> <span class="kw">val</span> id: <span class="ty">UUID</span> = <span class="ty">UUID</span>.randomUUID(),
+    <span class="kw">val</span> workspaceId: <span class="ty">UUID</span>,
+    <span class="kw">val</span> userId: <span class="ty">UUID</span>,
+    <span class="kw">val</span> role: <span class="ty">WorkspaceRole</span>,
+    <span class="kw">val</span> joinedAt: <span class="ty">Instant</span> = <span class="ty">Instant</span>.now()
+)
+
+<span class="cm">// Helper on the enum — checks if a role "outranks" another</span>
+<span class="kw">fun</span> <span class="ty">WorkspaceRole</span>.<span class="fn">hasAtLeast</span>(required: <span class="ty">WorkspaceRole</span>): <span class="ty">Boolean</span> =
+    <span class="kw">this</span>.ordinal <= required.ordinal  <span class="cm">// OWNER=0, MEMBER=1, VIEWER=2</span></code></pre>
+
+            <h3>Board</h3>
+<pre><code><span class="an">@Table("boards")</span>
+<span class="kw">data class</span> <span class="ty">Board</span>(
+    <span class="an">@Id</span> <span class="kw">val</span> id: <span class="ty">UUID</span> = <span class="ty">UUID</span>.randomUUID(),
+    <span class="kw">val</span> workspaceId: <span class="ty">UUID</span>,
+    <span class="kw">val</span> name: <span class="ty">String</span>,
+    <span class="kw">val</span> createdBy: <span class="ty">UUID</span>,
+    <span class="kw">val</span> createdAt: <span class="ty">Instant</span> = <span class="ty">Instant</span>.now()
+)</code></pre>
+
+            <h3>Column</h3>
+<pre><code><span class="an">@Table("columns")</span>
+<span class="kw">data class</span> <span class="ty">BoardColumn</span>(  <span class="cm">// "Column" is reserved in SQL, hence BoardColumn</span>
+    <span class="an">@Id</span> <span class="kw">val</span> id: <span class="ty">UUID</span> = <span class="ty">UUID</span>.randomUUID(),
+    <span class="kw">val</span> boardId: <span class="ty">UUID</span>,
+    <span class="kw">val</span> name: <span class="ty">String</span>,
+    <span class="kw">val</span> position: <span class="ty">Int</span>  <span class="cm">// for ordering: 0, 1, 2, 3...</span>
+)</code></pre>
+
+            <h3>Task</h3>
+<pre><code><span class="kw">enum class</span> <span class="ty">Priority</span> { LOW, MEDIUM, HIGH, URGENT }
+
+<span class="an">@Table("tasks")</span>
+<span class="kw">data class</span> <span class="ty">Task</span>(
+    <span class="an">@Id</span> <span class="kw">val</span> id: <span class="ty">UUID</span> = <span class="ty">UUID</span>.randomUUID(),
+    <span class="kw">val</span> columnId: <span class="ty">UUID</span>,
+    <span class="kw">val</span> boardId: <span class="ty">UUID</span>,      <span class="cm">// denormalized for easier queries</span>
+    <span class="kw">val</span> title: <span class="ty">String</span>,
+    <span class="kw">val</span> description: <span class="ty">String</span>? = <span class="kw">null</span>,
+    <span class="kw">val</span> priority: <span class="ty">Priority</span> = <span class="ty">Priority</span>.MEDIUM,
+    <span class="kw">val</span> position: <span class="ty">Int</span>,
+    <span class="kw">val</span> assigneeId: <span class="ty">UUID</span>? = <span class="kw">null</span>,
+    <span class="kw">val</span> createdBy: <span class="ty">UUID</span>,
+    <span class="kw">val</span> createdAt: <span class="ty">Instant</span> = <span class="ty">Instant</span>.now(),
+    <span class="kw">val</span> updatedAt: <span class="ty">Instant</span> = <span class="ty">Instant</span>.now()
+)</code></pre>
+
+            <h3>Comment</h3>
+<pre><code><span class="an">@Table("comments")</span>
+<span class="kw">data class</span> <span class="ty">Comment</span>(
+    <span class="an">@Id</span> <span class="kw">val</span> id: <span class="ty">UUID</span> = <span class="ty">UUID</span>.randomUUID(),
+    <span class="kw">val</span> taskId: <span class="ty">UUID</span>,
+    <span class="kw">val</span> authorId: <span class="ty">UUID</span>,
+    <span class="kw">val</span> content: <span class="ty">String</span>,
+    <span class="kw">val</span> createdAt: <span class="ty">Instant</span> = <span class="ty">Instant</span>.now()
+)</code></pre>
+        </div>
+
+        <div class="section">
+            <h2>🔐 Roles & Permissions</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Action</th>
+                        <th>VIEWER</th>
+                        <th>MEMBER</th>
+                        <th>OWNER</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>View boards, tasks, comments</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td></tr>
+                    <tr><td>Create tasks, comments</td><td class="cross">✗</td><td class="check">✓</td><td class="check">✓</td></tr>
+                    <tr><td>Edit any task</td><td class="cross">✗</td><td class="check">✓</td><td class="check">✓</td></tr>
+                    <tr><td>Move tasks between columns</td><td class="cross">✗</td><td class="check">✓</td><td class="check">✓</td></tr>
+                    <tr><td>Delete own comments</td><td class="cross">✗</td><td class="check">✓</td><td class="check">✓</td></tr>
+                    <tr><td>Create/rename columns</td><td class="cross">✗</td><td class="check">✓</td><td class="check">✓</td></tr>
+                    <tr><td>Delete any task or comment</td><td class="cross">✗</td><td class="cross">✗</td><td class="check">✓</td></tr>
+                    <tr><td>Delete columns</td><td class="cross">✗</td><td class="cross">✗</td><td class="check">✓</td></tr>
+                    <tr><td>Delete boards</td><td class="cross">✗</td><td class="cross">✗</td><td class="check">✓</td></tr>
+                    <tr><td>Invite / remove members</td><td class="cross">✗</td><td class="cross">✗</td><td class="check">✓</td></tr>
+                    <tr><td>Change member roles</td><td class="cross">✗</td><td class="cross">✗</td><td class="check">✓</td></tr>
+                    <tr><td>Delete workspace</td><td class="cross">✗</td><td class="cross">✗</td><td class="check">✓</td></tr>
+                </tbody>
+            </table>
+
+            <div class="callout warn" style="margin-top:16px;">
+                <span class="icon">⚠️</span>
+                <span>Roles are <strong>per workspace</strong>, not global. A user can be OWNER in workspace A and VIEWER in workspace B. This is why you need <code>WorkspaceMembership</code> as a join table that carries the role, not a single role field on the user.</span>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🗄️ Database Schema (Flyway Migrations)</h2>
+<pre><code><span class="cm">-- V1__create_users.sql</span>
+CREATE TABLE users (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email       VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    display_name  VARCHAR(100) NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+<span class="cm">-- V2__create_workspaces.sql</span>
+CREATE TABLE workspaces (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name        VARCHAR(100) NOT NULL,
+    created_by  UUID NOT NULL REFERENCES users(id),
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE workspace_memberships (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    user_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role         VARCHAR(20) NOT NULL CHECK (role IN ('OWNER','MEMBER','VIEWER')),
+    joined_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(workspace_id, user_id)
+);
+
+<span class="cm">-- V3__create_boards_and_columns.sql</span>
+CREATE TABLE boards (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    name         VARCHAR(100) NOT NULL,
+    created_by   UUID NOT NULL REFERENCES users(id),
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE columns (
+    id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    board_id UUID NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+    name     VARCHAR(100) NOT NULL,
+    position INT NOT NULL
+);
+
+<span class="cm">-- V4__create_tasks_and_comments.sql</span>
+CREATE TABLE tasks (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    column_id   UUID NOT NULL REFERENCES columns(id) ON DELETE CASCADE,
+    board_id    UUID NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+    title       VARCHAR(255) NOT NULL,
+    description TEXT,
+    priority    VARCHAR(20) NOT NULL DEFAULT 'MEDIUM',
+    position    INT NOT NULL,
+    assignee_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_by  UUID NOT NULL REFERENCES users(id),
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE comments (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    task_id    UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    author_id  UUID NOT NULL REFERENCES users(id),
+    content    TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);</code></pre>
+        </div>
+
+    </div>
+
+    <!-- ENDPOINTS -->
+    <div id="tab-endpoints" class="tab-panel">
+
+        <div class="section">
+            <h2>🔌 API Endpoints</h2>
+
+            <div class="callout info">
+                <span class="icon">🔑</span>
+                <span>All endpoints except <code>POST /auth/register</code> and <code>POST /auth/login</code> require a valid JWT in the <code>Authorization: Bearer &lt;token&gt;</code> header. Authorization beyond that is workspace-scoped per the roles table.</span>
+            </div>
+
+            <div class="endpoint-group">
+                <h4>Auth</h4>
+                <div class="endpoint">
+                    <span class="method POST">POST</span>
+                    <span class="endpoint-path">/api/v1/auth/register</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method POST">POST</span>
+                    <span class="endpoint-path">/api/v1/auth/login</span>
+                    <span class="endpoint-note">Returns a JWT token. No refresh tokens for MVP.</span>
+                </div>
+            </div>
+
+            <div class="endpoint-group">
+                <h4>Workspaces</h4>
+                <div class="endpoint">
+                    <span class="method POST">POST</span>
+                    <span class="endpoint-path">/api/v1/workspaces</span>
+                    <span class="role-badge auth">Authenticated</span>
+                    <span class="endpoint-note">Creator automatically becomes OWNER of the new workspace.</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method GET">GET</span>
+                    <span class="endpoint-path">/api/v1/workspaces</span>
+                    <span class="role-badge auth">Authenticated</span>
+                    <span class="endpoint-note">Returns only the workspaces the current user is a member of.</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method GET">GET</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span></span>
+                    <span class="role-badge viewer">VIEWER+</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method PUT">PUT</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span></span>
+                    <span class="role-badge owner">OWNER</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method DELETE">DELETE</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span></span>
+                    <span class="role-badge owner">OWNER</span>
+                </div>
+            </div>
+
+            <div class="endpoint-group">
+                <h4>Workspace Members</h4>
+                <div class="endpoint">
+                    <span class="method GET">GET</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span>/members</span>
+                    <span class="role-badge viewer">VIEWER+</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method POST">POST</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span>/members</span>
+                    <span class="role-badge owner">OWNER</span>
+                    <span class="endpoint-note">Invite by email. Body: <code>{ "email": "...", "role": "MEMBER" }</code></span>
+                </div>
+                <div class="endpoint">
+                    <span class="method PUT">PUT</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span>/members/<span class="param">{userId}</span></span>
+                    <span class="role-badge owner">OWNER</span>
+                    <span class="endpoint-note">Change a member's role.</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method DELETE">DELETE</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span>/members/<span class="param">{userId}</span></span>
+                    <span class="role-badge owner">OWNER</span>
+                    <span class="endpoint-note">OWNER can remove anyone. A user can also remove themselves (leave workspace).</span>
+                </div>
+            </div>
+
+            <div class="endpoint-group">
+                <h4>Boards</h4>
+                <div class="endpoint">
+                    <span class="method POST">POST</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span>/boards</span>
+                    <span class="role-badge member">MEMBER+</span>
+                    <span class="endpoint-note">Creates the board with 3 default columns: Backlog, In Progress, Done.</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method GET">GET</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span>/boards</span>
+                    <span class="role-badge viewer">VIEWER+</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method GET">GET</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span>/boards/<span class="param">{boardId}</span></span>
+                    <span class="role-badge viewer">VIEWER+</span>
+                    <span class="endpoint-note">Returns board with its columns and tasks nested in.</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method DELETE">DELETE</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span>/boards/<span class="param">{boardId}</span></span>
+                    <span class="role-badge owner">OWNER</span>
+                </div>
+            </div>
+
+            <div class="endpoint-group">
+                <h4>Columns</h4>
+                <div class="endpoint">
+                    <span class="method POST">POST</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span>/boards/<span class="param">{boardId}</span>/columns</span>
+                    <span class="role-badge member">MEMBER+</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method PUT">PUT</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span>/boards/<span class="param">{boardId}</span>/columns/<span class="param">{columnId}</span></span>
+                    <span class="role-badge member">MEMBER+</span>
+                    <span class="endpoint-note">Rename or reorder (change position).</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method DELETE">DELETE</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span>/boards/<span class="param">{boardId}</span>/columns/<span class="param">{columnId}</span></span>
+                    <span class="role-badge owner">OWNER</span>
+                    <span class="endpoint-note">Only allowed if column is empty. Return 409 Conflict if it has tasks.</span>
+                </div>
+            </div>
+
+            <div class="endpoint-group">
+                <h4>Tasks</h4>
+                <div class="endpoint">
+                    <span class="method POST">POST</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span>/boards/<span class="param">{boardId}</span>/tasks</span>
+                    <span class="role-badge member">MEMBER+</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method GET">GET</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span>/boards/<span class="param">{boardId}</span>/tasks</span>
+                    <span class="role-badge viewer">VIEWER+</span>
+                    <span class="endpoint-note">Returns all tasks on the board, grouped by column.</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method GET">GET</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span>/boards/<span class="param">{boardId}</span>/tasks/<span class="param">{taskId}</span></span>
+                    <span class="role-badge viewer">VIEWER+</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method PUT">PUT</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span>/boards/<span class="param">{boardId}</span>/tasks/<span class="param">{taskId}</span></span>
+                    <span class="role-badge member">MEMBER+</span>
+                    <span class="endpoint-note">Edit title, description, priority, assignee.</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method PATCH">PATCH</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span>/boards/<span class="param">{boardId}</span>/tasks/<span class="param">{taskId}</span>/move</span>
+                    <span class="role-badge member">MEMBER+</span>
+                    <span class="endpoint-note">Move task to a different column or reorder within the same column. Body: <code>{ "columnId": "...", "position": 2 }</code></span>
+                </div>
+                <div class="endpoint">
+                    <span class="method DELETE">DELETE</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span>/boards/<span class="param">{boardId}</span>/tasks/<span class="param">{taskId}</span></span>
+                    <span class="role-badge owner">OWNER</span>
+                </div>
+            </div>
+
+            <div class="endpoint-group">
+                <h4>Comments</h4>
+                <div class="endpoint">
+                    <span class="method POST">POST</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span>/boards/<span class="param">{boardId}</span>/tasks/<span class="param">{taskId}</span>/comments</span>
+                    <span class="role-badge member">MEMBER+</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method GET">GET</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span>/boards/<span class="param">{boardId}</span>/tasks/<span class="param">{taskId}</span>/comments</span>
+                    <span class="role-badge viewer">VIEWER+</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method DELETE">DELETE</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span>/boards/<span class="param">{boardId}</span>/tasks/<span class="param">{taskId}</span>/comments/<span class="param">{commentId}</span></span>
+                    <span class="role-badge member">MEMBER+</span>
+                    <span class="endpoint-note">MEMBER can delete their own comments. OWNER can delete any comment.</span>
+                </div>
+            </div>
+
+            <div class="endpoint-group">
+                <h4>Real-Time Events (Phase 2)</h4>
+                <div class="endpoint">
+                    <span class="method GET">GET</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span>/boards/<span class="param">{boardId}</span>/events</span>
+                    <span class="role-badge viewer">VIEWER+</span>
+                    <span class="endpoint-note">SSE endpoint. <code>Accept: text/event-stream</code>. Connection stays open. Pushes events when tasks are created/moved/updated.</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method GET">GET</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span>/boards/<span class="param">{boardId}</span>/activity</span>
+                    <span class="role-badge viewer">VIEWER+</span>
+                    <span class="endpoint-note">Returns the stored activity log as a stream (<code>Flow&lt;ActivityEvent&gt;</code>).</span>
+                </div>
+            </div>
+
+            <div class="endpoint-group">
+                <h4>Labels (Phase 3)</h4>
+                <div class="endpoint">
+                    <span class="method POST">POST</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span>/labels</span>
+                    <span class="role-badge member">MEMBER+</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method GET">GET</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span>/labels</span>
+                    <span class="role-badge viewer">VIEWER+</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method DELETE">DELETE</span>
+                    <span class="endpoint-path">/api/v1/workspaces/<span class="param">{workspaceId}</span>/labels/<span class="param">{labelId}</span></span>
+                    <span class="role-badge owner">OWNER</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method POST">POST</span>
+                    <span class="endpoint-path">…/tasks/<span class="param">{taskId}</span>/labels/<span class="param">{labelId}</span></span>
+                    <span class="role-badge member">MEMBER+</span>
+                    <span class="endpoint-note">Attach a label to a task.</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method DELETE">DELETE</span>
+                    <span class="endpoint-path">…/tasks/<span class="param">{taskId}</span>/labels/<span class="param">{labelId}</span></span>
+                    <span class="role-badge member">MEMBER+</span>
+                    <span class="endpoint-note">Detach a label from a task.</span>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- PHASES -->
+    <div id="tab-phases" class="tab-panel">
+
+        <!-- Phase 1 -->
+        <div class="section">
+            <div class="phase-header">
+                <div class="phase-number p1">1</div>
+                <div class="phase-header-text">
+                    <h2>Core API</h2>
+                    <p>A fully working REST API with auth, roles, and all CRUD. No real-time yet. Estimated: 2–3 weeks.</p>
+                </div>
+            </div>
+
+            <h3>Goal</h3>
+            <p style="color:var(--text-dim); margin-bottom:16px;">By the end of Phase 1, you should be able to register a user, log in, create a workspace, invite another user, create a board, create tasks, and move them between columns. All protected by JWT and workspace roles.</p>
+
+            <h3>Implementation Steps</h3>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-num">1</div>
+                    <div class="step-body">
+                        <h4>Project Setup</h4>
+                        <p>Create the project on start.spring.io. Add all dependencies. Get the app to start. Connect to a local PostgreSQL (via Docker: <code>docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=pass postgres</code>). Write the first Flyway migration for the <code>users</code> table. Verify it runs on startup.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-num">2</div>
+                    <div class="step-body">
+                        <h4>User Registration & Login (no security config yet)</h4>
+                        <p>Write the <code>User</code> entity, <code>UserRepository</code>, <code>AuthService</code>, and <code>AuthController</code>. Hash passwords with BCrypt. Return a hardcoded fake JWT string for now. The goal is: does data reach the database? Don't touch security config yet — permit all requests temporarily.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-num">3</div>
+                    <div class="step-body">
+                        <h4>Real JWT Generation</h4>
+                        <p>Write <code>JwtService</code> using the <code>jjwt</code> library. Generate a real token on login. Write a method to validate a token and extract the user ID. Test this in isolation with a unit test before wiring it into anything.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-num">4</div>
+                    <div class="step-body">
+                        <h4>Security Config (the hardest part of Phase 1)</h4>
+                        <p>Write <code>SecurityConfig.kt</code> and <code>JwtAuthFilter.kt</code>. In reactive Spring Security, you extend <code>WebFilter</code> not <code>OncePerRequestFilter</code>. You set the security context via <code>ReactiveSecurityContextHolder</code>. Permit <code>/auth/**</code>, protect everything else. Read the Spring Security Reactive docs carefully here.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-num">5</div>
+                    <div class="step-body">
+                        <h4>Workspaces + Memberships</h4>
+                        <p>Write the workspace CRUD. When a workspace is created, also insert a <code>WorkspaceMembership</code> record for the creator with role OWNER. Write <code>WorkspaceAuthorizationService</code> — the component that will be used in <code>@PreAuthorize</code> to check workspace roles.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-num">6</div>
+                    <div class="step-body">
+                        <h4>Boards + Columns</h4>
+                        <p>Write board CRUD. When a board is created, also create 3 default columns (Backlog, In Progress, Done) with positions 0, 1, 2. Write the column rename and reorder logic — reordering means shifting other columns' position values.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-num">7</div>
+                    <div class="step-body">
+                        <h4>Tasks + Comments</h4>
+                        <p>Write task CRUD. The PATCH move endpoint is the most interesting — moving a task between columns needs to update the <code>columnId</code> AND recalculate positions for tasks in both the source and destination columns. Write comments CRUD. Enforce "author or OWNER can delete" logic in the service.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-num">8</div>
+                    <div class="step-body">
+                        <h4>Global Exception Handler</h4>
+                        <p>Write a <code>@ControllerAdvice</code> class (in WebFlux it's <code>@RestControllerAdvice</code>) that catches custom exceptions like <code>NotFoundException</code>, <code>ForbiddenException</code>, <code>ConflictException</code> and maps them to proper HTTP responses with a consistent error body.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-num">9</div>
+                    <div class="step-body">
+                        <h4>Tests for Phase 1</h4>
+                        <p>Unit test all service logic (task move, permission checks, column reordering) with MockK. Integration test all controllers with <code>WebTestClient</code> and Testcontainers (a real PostgreSQL, not H2). Aim for happy path + the most important error cases.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="callout warn">
+                <span class="icon">⚠️</span>
+                <span><strong>The Security Context trap:</strong> In reactive Spring Security, <code>SecurityContextHolder.getContext()</code> won't work. You must use <code>ReactiveSecurityContextHolder.getContext()</code> which returns a <code>Mono</code>. In a <code>suspend</code> function you can <code>awaitSingle()</code> it. This will confuse you at least once. When it does, search for "spring webflux coroutines security context" — there's good material on this.</span>
+            </div>
+        </div>
+
+        <!-- Phase 2 -->
+        <div class="section">
+            <div class="phase-header">
+                <div class="phase-number p2">2</div>
+                <div class="phase-header-text">
+                    <h2>Real-Time Events + Activity Log</h2>
+                    <p>Make the board live. Add an audit trail. Estimated: 1–2 weeks.</p>
+                </div>
+            </div>
+
+            <h3>New Concepts Introduced</h3>
+            <div class="card-grid" style="margin-bottom:20px;">
+                <div class="card blue">
+                    <h4>SharedFlow</h4>
+                    <p>An in-memory pub/sub channel. Multiple coroutines can collect from it simultaneously. When you emit, all collectors get it.</p>
+                </div>
+                <div class="card blue">
+                    <h4>Server-Sent Events (SSE)</h4>
+                    <p>A one-way HTTP connection that stays open. The server pushes data to the client whenever it wants. The client doesn't need to poll.</p>
+                </div>
+                <div class="card blue">
+                    <h4>BoardEvent (sealed class)</h4>
+                    <p>A sealed class hierarchy representing everything that can happen on a board. The SSE stream emits these.</p>
+                </div>
+            </div>
+
+            <h3>The BoardEvent Sealed Class</h3>
+<pre><code><span class="kw">sealed class</span> <span class="ty">BoardEvent</span> {
+    <span class="kw">abstract val</span> boardId: <span class="ty">UUID</span>
+    <span class="kw">abstract val</span> timestamp: <span class="ty">Instant</span>
+
+    <span class="kw">data class</span> <span class="ty">TaskCreated</span>(
+        <span class="kw">override val</span> boardId: <span class="ty">UUID</span>,
+        <span class="kw">val</span> task: <span class="ty">TaskResponse</span>,
+        <span class="kw">override val</span> timestamp: <span class="ty">Instant</span> = <span class="ty">Instant</span>.now()
+    ) : <span class="ty">BoardEvent</span>()
+
+    <span class="kw">data class</span> <span class="ty">TaskMoved</span>(
+        <span class="kw">override val</span> boardId: <span class="ty">UUID</span>,
+        <span class="kw">val</span> taskId: <span class="ty">UUID</span>,
+        <span class="kw">val</span> fromColumnId: <span class="ty">UUID</span>,
+        <span class="kw">val</span> toColumnId: <span class="ty">UUID</span>,
+        <span class="kw">override val</span> timestamp: <span class="ty">Instant</span> = <span class="ty">Instant</span>.now()
+    ) : <span class="ty">BoardEvent</span>()
+
+    <span class="kw">data class</span> <span class="ty">TaskUpdated</span>(
+        <span class="kw">override val</span> boardId: <span class="ty">UUID</span>,
+        <span class="kw">val</span> task: <span class="ty">TaskResponse</span>,
+        <span class="kw">override val</span> timestamp: <span class="ty">Instant</span> = <span class="ty">Instant</span>.now()
+    ) : <span class="ty">BoardEvent</span>()
+
+    <span class="kw">data class</span> <span class="ty">TaskDeleted</span>(
+        <span class="kw">override val</span> boardId: <span class="ty">UUID</span>,
+        <span class="kw">val</span> taskId: <span class="ty">UUID</span>,
+        <span class="kw">override val</span> timestamp: <span class="ty">Instant</span> = <span class="ty">Instant</span>.now()
+    ) : <span class="ty">BoardEvent</span>()
+
+    <span class="kw">data class</span> <span class="ty">CommentAdded</span>(
+        <span class="kw">override val</span> boardId: <span class="ty">UUID</span>,
+        <span class="kw">val</span> taskId: <span class="ty">UUID</span>,
+        <span class="kw">val</span> comment: <span class="ty">CommentResponse</span>,
+        <span class="kw">override val</span> timestamp: <span class="ty">Instant</span> = <span class="ty">Instant</span>.now()
+    ) : <span class="ty">BoardEvent</span>()
+}</code></pre>
+
+            <h3>The BoardEventBus</h3>
+<pre><code><span class="an">@Component</span>
+<span class="kw">class</span> <span class="ty">BoardEventBus</span> {
+
+    <span class="cm">// One SharedFlow per board, created lazily when first needed</span>
+    <span class="kw">private val</span> flows = <span class="ty">ConcurrentHashMap</span><<span class="ty">UUID</span>, <span class="ty">MutableSharedFlow</span><<span class="ty">BoardEvent</span>>>()
+
+    <span class="kw">private fun</span> <span class="fn">flowFor</span>(boardId: <span class="ty">UUID</span>): <span class="ty">MutableSharedFlow</span><<span class="ty">BoardEvent</span>> =
+        flows.getOrPut(boardId) {
+            <span class="fn">MutableSharedFlow</span>(replay = <span class="nu">0</span>, extraBufferCapacity = <span class="nu">64</span>)
+        }
+
+    <span class="cm">// Called from services when something happens</span>
+    <span class="kw">suspend fun</span> <span class="fn">publish</span>(event: <span class="ty">BoardEvent</span>) {
+        <span class="fn">flowFor</span>(event.boardId).<span class="fn">emit</span>(event)
+    }
+
+    <span class="cm">// Called from SSE controller to get the stream for a board</span>
+    <span class="kw">fun</span> <span class="fn">subscribe</span>(boardId: <span class="ty">UUID</span>): <span class="ty">Flow</span><<span class="ty">BoardEvent</span>> =
+        <span class="fn">flowFor</span>(boardId).<span class="fn">asSharedFlow</span>()
+}</code></pre>
+
+            <h3>The SSE Controller Endpoint</h3>
+<pre><code><span class="an">@GetMapping("/boards/{boardId}/events", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])</span>
+<span class="kw">fun</span> <span class="fn">boardEvents</span>(
+    <span class="an">@PathVariable</span> workspaceId: <span class="ty">UUID</span>,
+    <span class="an">@PathVariable</span> boardId: <span class="ty">UUID</span>,
+    <span class="an">@AuthenticationPrincipal</span> principal: <span class="ty">UserPrincipal</span>
+): <span class="ty">Flow</span><<span class="ty">ServerSentEvent</span><<span class="ty">BoardEvent</span>>> {
+    <span class="cm">// Auth check: is this user a member of the workspace?</span>
+    <span class="cm">// Then just return the flow — Spring handles the rest</span>
+    <span class="kw">return</span> eventBus.<span class="fn">subscribe</span>(boardId).<span class="fn">map</span> { event ->
+        <span class="ty">ServerSentEvent</span>.<span class="fn">builder</span>(event)
+            .id(<span class="ty">UUID</span>.<span class="fn">randomUUID</span>().<span class="fn">toString</span>())
+            .event(event::<span class="kw">class</span>.simpleName)
+            .<span class="fn">build</span>()
+    }
+}</code></pre>
+
+            <h3>Implementation Steps</h3>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-num">1</div>
+                    <div class="step-body">
+                        <h4>Add ActivityEvent table (Flyway migration)</h4>
+                        <p>New migration: <code>V5__create_activity_events.sql</code>. Fields: id, workspace_id, board_id, task_id (nullable), actor_id, action (varchar), payload (jsonb — stores event-specific data), created_at.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-num">2</div>
+                    <div class="step-body">
+                        <h4>Write BoardEventBus</h4>
+                        <p>Write and unit test the <code>BoardEventBus</code> in complete isolation. Use Turbine to test that emitting an event causes a subscriber to receive it. Don't wire it into anything yet.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-num">3</div>
+                    <div class="step-body">
+                        <h4>Instrument existing services</h4>
+                        <p>Go back to <code>TaskService</code>, <code>CommentService</code>, etc. After each mutation (save, delete, move), call <code>eventBus.publish()</code> AND save an <code>ActivityEvent</code> to the database. Both happen in the same service method.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-num">4</div>
+                    <div class="step-body">
+                        <h4>Write the SSE endpoint</h4>
+                        <p>Add the <code>/events</code> endpoint to <code>BoardController</code>. Test it manually in Postman first: open the SSE tab, then in a second tab create/move a task, and watch the first tab update live.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-num">5</div>
+                    <div class="step-body">
+                        <h4>Write the activity log endpoint</h4>
+                        <p>Simple: <code>activityRepository.findByBoardIdOrderByCreatedAtDesc(boardId)</code> returning a <code>Flow</code>. The controller returns it directly. Spring streams it.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Phase 3 -->
+        <div class="section">
+            <div class="phase-header">
+                <div class="phase-number p3">3</div>
+                <div class="phase-header-text">
+                    <h2>Labels, Filtering & Search</h2>
+                    <p>Make the API practically useful. Estimated: 1 week.</p>
+                </div>
+            </div>
+
+            <h3>What's New</h3>
+            <div class="card-grid" style="margin-bottom:16px;">
+                <div class="card yellow">
+                    <h4>Many-to-Many in R2DBC</h4>
+                    <p>No <code>@ManyToMany</code> annotation exists. You manage the join table yourself in the service layer. More code, but more explicit.</p>
+                </div>
+                <div class="card yellow">
+                    <h4>Dynamic Queries</h4>
+                    <p>R2DBC doesn't have JPA's Specification API. You'll build query strings dynamically based on which filter params are present.</p>
+                </div>
+            </div>
+
+            <h3>Labels Schema</h3>
+<pre><code><span class="cm">-- V6__create_labels.sql</span>
+CREATE TABLE labels (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    name         VARCHAR(50) NOT NULL,
+    color        VARCHAR(7) NOT NULL DEFAULT '#6366f1' <span class="cm">-- hex color</span>
+);
+
+CREATE TABLE task_labels (
+    task_id  UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    label_id UUID NOT NULL REFERENCES labels(id) ON DELETE CASCADE,
+    PRIMARY KEY (task_id, label_id)
+);</code></pre>
+
+            <h3>Filtered Task Query</h3>
+<pre><code><span class="cm">// Query params: assignee, priority, labelId, search (title contains)</span>
+<span class="cm">// In the service, build the query based on which params are non-null</span>
+
+<span class="kw">suspend fun</span> <span class="fn">getTasks</span>(
+    boardId: <span class="ty">UUID</span>,
+    assigneeId: <span class="ty">UUID</span>?,
+    priority: <span class="ty">Priority</span>?,
+    labelId: <span class="ty">UUID</span>?,
+    search: <span class="ty">String</span>?
+): <span class="ty">Flow</span><<span class="ty">Task</span>> {
+    <span class="cm">// R2DBC doesn't have Specifications. Use DatabaseClient for dynamic queries.</span>
+    <span class="cm">// This is where you'll write actual SQL fragments conditionally.</span>
+    <span class="cm">// It's more manual but gives you direct SQL control.</span>
+}</code></pre>
+        </div>
+
+        <!-- Phase 4 -->
+        <div class="section">
+            <div class="phase-header">
+                <div class="phase-number p4">4</div>
+                <div class="phase-header-text">
+                    <h2>Redis (Stretch Goal)</h2>
+                    <p>Replace SharedFlow with Redis pub/sub. Add caching. Estimated: 1 week. Only if you're not burnt out!</p>
+                </div>
+            </div>
+
+            <div class="callout tip">
+                <span class="icon">✅</span>
+                <span>The whole point of doing <code>SharedFlow</code> first is that swapping it for Redis should require changing <strong>almost nothing</strong> outside of <code>BoardEventBus</code>. If you designed Phase 2 well, the SSE endpoint and the services don't change at all. Only the bus internals change.</span>
+            </div>
+
+            <h3>What Changes</h3>
+            <div class="card-grid">
+                <div class="card red">
+                    <h4>BoardEventBus internals</h4>
+                    <p>Instead of <code>MutableSharedFlow</code>, use <code>ReactiveRedisTemplate</code> to publish and subscribe. The interface of <code>BoardEventBus</code> stays the same.</p>
+                </div>
+                <div class="card red">
+                    <h4>Redis Caching</h4>
+                    <p>Cache the "get board with columns and tasks" response. Invalidate the cache key when any task or column in that board changes.</p>
+                </div>
+                <div class="card red">
+                    <h4>Docker Compose</h4>
+                    <p>Write a <code>docker-compose.yml</code> that runs PostgreSQL + Redis together. One command spins up your entire local dev environment.</p>
+                </div>
+            </div>
+
+            <h3>Docker Compose Setup</h3>
+<pre><code><span class="cm"># docker-compose.yml</span>
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: taskboard
+      POSTGRES_PASSWORD: pass
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"</code></pre>
+            <p style="color:var(--text-dim); font-size:13px; margin-top:8px;">Run with: <code>docker compose up -d</code></p>
+        </div>
+
+    </div>
+
+    <!-- CONCEPTS -->
+    <div id="tab-concepts" class="tab-panel">
+
+        <div class="section">
+            <h2>🧠 Key Concepts You'll Learn</h2>
+
+            <div class="card-grid" style="margin-bottom:24px;">
+                <div class="card green">
+                    <h4>suspend functions</h4>
+                    <p>Functions that can pause without blocking a thread. The foundation of everything in this project.</p>
+                </div>
+                <div class="card green">
+                    <h4>Flow&lt;T&gt;</h4>
+                    <p>An async stream. Like a list but items arrive over time. Used for DB results, SSE, and pub/sub.</p>
+                </div>
+                <div class="card green">
+                    <h4>SharedFlow</h4>
+                    <p>A Flow that multiple collectors can subscribe to simultaneously. The in-memory pub/sub mechanism.</p>
+                </div>
+                <div class="card blue">
+                    <h4>R2DBC</h4>
+                    <p>Non-blocking DB access. Similar to JPA but no lazy loading or relationship annotations.</p>
+                </div>
+                <div class="card blue">
+                    <h4>WebFlux</h4>
+                    <p>The reactive Spring web framework. Controllers can return <code>Flow</code> and use <code>suspend</code> directly.</p>
+                </div>
+                <div class="card blue">
+                    <h4>Reactive Security</h4>
+                    <p>Spring Security rewritten for the reactive world. <code>SecurityContextHolder</code> becomes <code>ReactiveSecurityContextHolder</code>.</p>
+                </div>
+                <div class="card purple">
+                    <h4>Sealed Classes as Events</h4>
+                    <p>Model domain events as a sealed class hierarchy. Exhaustive <code>when</code> means you can't forget to handle a new event type.</p>
+                </div>
+                <div class="card purple">
+                    <h4>Extension Functions on Enums</h4>
+                    <p><code>WorkspaceRole.hasAtLeast()</code> — adding behavior to enums without modifying them.</p>
+                </div>
+                <div class="card yellow">
+                    <h4>Server-Sent Events</h4>
+                    <p>HTTP connections that stay open. The server pushes updates. The client just listens.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🔑 The Authorization Component</h2>
+            <p style="color:var(--text-dim); margin-bottom:14px;">This is one of the most interesting parts. A Spring component that gets used in <code>@PreAuthorize</code> to check workspace-scoped roles.</p>
+
+<pre><code><span class="an">@Component("workspaceAuth")</span>
+<span class="kw">class</span> <span class="ty">WorkspaceAuthorizationService</span>(
+    <span class="kw">private val</span> membershipRepository: <span class="ty">MembershipRepository</span>
+) {
+    <span class="kw">suspend fun</span> <span class="fn">hasRole</span>(
+        workspaceId: <span class="ty">UUID</span>,
+        requiredRole: <span class="ty">WorkspaceRole</span>,
+        principal: <span class="ty">UserPrincipal</span>
+    ): <span class="ty">Boolean</span> {
+        <span class="kw">return</span> membershipRepository
+            .<span class="fn">findByWorkspaceIdAndUserId</span>(workspaceId, principal.id)
+            ?.role
+            ?.<span class="fn">hasAtLeast</span>(requiredRole)
+            ?: <span class="kw">false</span>
+    }
+}
+
+<span class="cm">// Usage on a controller method:</span>
+<span class="an">@DeleteMapping("/{boardId}")</span>
+<span class="an">@PreAuthorize("@workspaceAuth.hasRole(#workspaceId, 'OWNER', principal)")</span>
+<span class="kw">suspend fun</span> <span class="fn">deleteBoard</span>(
+    <span class="an">@PathVariable</span> workspaceId: <span class="ty">UUID</span>,
+    <span class="an">@PathVariable</span> boardId: <span class="ty">UUID</span>
+): <span class="ty">ResponseEntity</span><<span class="ty">Unit</span>> { ... }</code></pre>
+
+            <div class="callout info">
+                <span class="icon">💡</span>
+                <span>The <code>#workspaceId</code> in the SpEL expression binds directly to the method parameter named <code>workspaceId</code>. This is the same mechanism you've seen in Java Spring — it's identical in Kotlin.</span>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>⚡ suspend vs Flow — When to Use Which</h2>
+            <table>
+                <thead>
+                    <tr><th>Situation</th><th>Use</th><th>Why</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Return a single thing from DB</td>
+                        <td><code>suspend fun getTask(): Task</code></td>
+                        <td>One result, done.</td>
+                    </tr>
+                    <tr>
+                        <td>Return a thing that might not exist</td>
+                        <td><code>suspend fun find(): Task?</code></td>
+                        <td>Nullable return, Kotlin handles this cleanly.</td>
+                    </tr>
+                    <tr>
+                        <td>Return a list from DB</td>
+                        <td><code>fun getTasks(): Flow&lt;Task&gt;</code></td>
+                        <td>Stream the results as they arrive instead of buffering all of them.</td>
+                    </tr>
+                    <tr>
+                        <td>SSE / live stream</td>
+                        <td><code>fun events(): Flow&lt;Event&gt;</code></td>
+                        <td>Flow that never completes on its own — Spring keeps the connection open.</td>
+                    </tr>
+                    <tr>
+                        <td>Save / update / delete</td>
+                        <td><code>suspend fun save(): Unit</code></td>
+                        <td>Side effect, no return value needed.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>🏗️ R2DBC vs JPA — Key Differences</h2>
+            <div class="two-col">
+                <div>
+                    <h3>JPA (what you know)</h3>
+                    <ul>
+                        <li><code>@OneToMany</code>, <code>@ManyToOne</code> work automatically</li>
+                        <li>Lazy loading — related entities fetched on access</li>
+                        <li>Cascading — save parent, children saved too</li>
+                        <li>Specifications for dynamic queries</li>
+                        <li><code>Optional&lt;T&gt;</code> returns</li>
+                    </ul>
+                </div>
+                <div>
+                    <h3>R2DBC (what you'll learn)</h3>
+                    <ul>
+                        <li>No relationship annotations — just foreign key IDs as fields</li>
+                        <li>No lazy loading — you fetch related data explicitly</li>
+                        <li>No cascading — you handle deletes manually</li>
+                        <li><code>DatabaseClient</code> for dynamic queries</li>
+                        <li><code>Flow&lt;T&gt;</code> and nullable returns</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="callout tip" style="margin-top:16px;">
+                <span class="icon">✅</span>
+                <span>R2DBC feels more verbose at first because you're explicit about everything. This is actually a good thing for learning — you see exactly what SQL is being executed, with no magic happening behind the scenes.</span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- TESTING -->
+    <div id="tab-testing" class="tab-panel">
+
+        <div class="section">
+            <h2>🧪 Testing Strategy</h2>
+            <p style="color:var(--text-dim); margin-bottom:16px;">Three levels of tests. Each level has a clear purpose. Don't try to cover everything with integration tests and don't try to cover everything with unit tests.</p>
+
+            <div class="card-grid" style="margin-bottom:20px;">
+                <div class="card green">
+                    <h4>Unit Tests</h4>
+                    <p>Test a single class. All dependencies are mocked with MockK. Fast. No Spring context. No database.</p>
+                </div>
+                <div class="card blue">
+                    <h4>Integration Tests</h4>
+                    <p>Boot the full Spring context. Use a real database via Testcontainers. Test the full request → response chain.</p>
+                </div>
+                <div class="card yellow">
+                    <h4>Flow Tests</h4>
+                    <p>Test async streams with Turbine. Verify that emitting events causes subscribers to receive the right values.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Unit Tests with MockK</h2>
+            <p style="color:var(--text-dim); margin-bottom:14px;">Test service logic in isolation. This is where TDD makes the most sense — write the test before the service method.</p>
+
+<pre><code><span class="kw">class</span> <span class="ty">TaskServiceTest</span> {
+
+    <span class="kw">private val</span> taskRepository = <span class="fn">mockk</span><<span class="ty">TaskRepository</span>>()
+    <span class="kw">private val</span> eventBus = <span class="fn">mockk</span><<span class="ty">BoardEventBus</span>>()
+    <span class="kw">private val</span> service = <span class="ty">TaskService</span>(taskRepository, eventBus)
+
+    <span class="an">@Test</span>
+    <span class="kw">fun</span> <span class="fn">`should throw NotFoundException when task does not exist`</span>() = <span class="fn">runTest</span> {
+        <span class="cm">// Given</span>
+        <span class="fn">coEvery</span> { taskRepository.<span class="fn">findById</span>(<span class="fn">any</span><<span class="ty">UUID</span>>()) } <span class="kw">returns</span> <span class="kw">null</span>
+
+        <span class="cm">// When + Then</span>
+        <span class="fn">assertThrows</span><<span class="ty">NotFoundException</span>> {
+            service.<span class="fn">getTask</span>(<span class="ty">UUID</span>.<span class="fn">randomUUID</span>())
+        }
+    }
+
+    <span class="an">@Test</span>
+    <span class="kw">fun</span> <span class="fn">`should publish TaskMoved event when task is moved to a new column`</span>() = <span class="fn">runTest</span> {
+        <span class="cm">// Given</span>
+        <span class="kw">val</span> task = <span class="fn">aTask</span>()  <span class="cm">// test data builder function</span>
+        <span class="fn">coEvery</span> { taskRepository.<span class="fn">findById</span>(task.id) } <span class="kw">returns</span> task
+        <span class="fn">coEvery</span> { taskRepository.<span class="fn">save</span>(<span class="fn">any</span>()) } <span class="kw">returns</span> task
+        <span class="fn">coEvery</span> { eventBus.<span class="fn">publish</span>(<span class="fn">any</span>()) } <span class="kw">just</span> runs
+
+        <span class="cm">// When</span>
+        service.<span class="fn">moveTask</span>(task.id, newColumnId = <span class="ty">UUID</span>.<span class="fn">randomUUID</span>(), position = <span class="nu">0</span>)
+
+        <span class="cm">// Then</span>
+        <span class="fn">coVerify</span> { eventBus.<span class="fn">publish</span>(<span class="fn">ofType</span><<span class="ty">BoardEvent</span>.<span class="ty">TaskMoved</span>>()) }
+    }
+}
+
+<span class="cm">// Test data builder — keeps tests readable</span>
+<span class="kw">fun</span> <span class="fn">aTask</span>(
+    id: <span class="ty">UUID</span> = <span class="ty">UUID</span>.<span class="fn">randomUUID</span>(),
+    title: <span class="ty">String</span> = <span class="st">"Test Task"</span>,
+    columnId: <span class="ty">UUID</span> = <span class="ty">UUID</span>.<span class="fn">randomUUID</span>(),
+    boardId: <span class="ty">UUID</span> = <span class="ty">UUID</span>.<span class="fn">randomUUID</span>()
+) = <span class="ty">Task</span>(id = id, title = title, columnId = columnId, boardId = boardId,
+          priority = <span class="ty">Priority</span>.MEDIUM, position = <span class="nu">0</span>, createdBy = <span class="ty">UUID</span>.<span class="fn">randomUUID</span>())</code></pre>
+
+            <div class="callout tip">
+                <span class="icon">✅</span>
+                <span><strong>Test data builders</strong> (the <code>aTask()</code> function above) are your best friend. They let you create test objects with sensible defaults and only override what the specific test cares about. One file called <code>TestFixtures.kt</code> with all your builders keeps things clean.</span>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Integration Tests with WebTestClient</h2>
+<pre><code><span class="an">@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)</span>
+<span class="an">@Testcontainers</span>
+<span class="kw">class</span> <span class="ty">TaskControllerIntegrationTest</span>(
+    <span class="an">@Autowired</span> <span class="kw">private val</span> client: <span class="ty">WebTestClient</span>,
+    <span class="an">@Autowired</span> <span class="kw">private val</span> userRepository: <span class="ty">UserRepository</span>
+) {
+    <span class="kw">companion object</span> {
+        <span class="an">@Container</span>
+        <span class="kw">val</span> postgres = <span class="ty">PostgreSQLContainer</span><<span class="ty">Nothing</span>>(<span class="st">"postgres:16"</span>).<span class="fn">apply</span> {
+            <span class="fn">withDatabaseName</span>(<span class="st">"testdb"</span>)
+            <span class="fn">withUsername</span>(<span class="st">"test"</span>)
+            <span class="fn">withPassword</span>(<span class="st">"test"</span>)
+        }
+    }
+
+    <span class="kw">private lateinit var</span> token: <span class="ty">String</span>
+
+    <span class="an">@BeforeEach</span>
+    <span class="kw">fun</span> <span class="fn">setUp</span>() = <span class="fn">runTest</span> {
+        <span class="cm">// Register + login to get a token for auth'd requests</span>
+        token = client.<span class="fn">post</span>().<span class="fn">uri</span>(<span class="st">"/api/v1/auth/login"</span>)
+            .<span class="fn">bodyValue</span>(<span class="ty">LoginRequest</span>(<span class="st">"test@test.com"</span>, <span class="st">"password"</span>))
+            .<span class="fn">exchange</span>()
+            .<span class="fn">expectBody</span><<span class="ty">LoginResponse</span>>()
+            .<span class="fn">returnResult</span>().responseBody!!.token
+    }
+
+    <span class="an">@Test</span>
+    <span class="kw">fun</span> <span class="fn">`should create task and return 201`</span>() {
+        client.<span class="fn">post</span>()
+            .<span class="fn">uri</span>(<span class="st">"/api/v1/workspaces/{wId}/boards/{bId}/tasks"</span>, workspaceId, boardId)
+            .<span class="fn">header</span>(<span class="st">"Authorization"</span>, <span class="st">"Bearer $token"</span>)
+            .<span class="fn">bodyValue</span>(<span class="ty">CreateTaskRequest</span>(title = <span class="st">"My Task"</span>))
+            .<span class="fn">exchange</span>()
+            .<span class="fn">expectStatus</span>().<span class="fn">isCreated</span>
+            .<span class="fn">expectBody</span><<span class="ty">TaskResponse</span>>()
+            .<span class="fn">consumeWith</span> { result ->
+                <span class="fn">assertThat</span>(result.responseBody!!.title).<span class="fn">isEqualTo</span>(<span class="st">"My Task"</span>)
+            }
+    }
+
+    <span class="an">@Test</span>
+    <span class="kw">fun</span> <span class="fn">`should return 403 when VIEWER tries to create task`</span>() {
+        <span class="cm">// Set up a second user with VIEWER role, get their token, try to POST</span>
+        client.<span class="fn">post</span>()
+            .<span class="fn">uri</span>(<span class="st">"/api/v1/workspaces/{wId}/boards/{bId}/tasks"</span>, workspaceId, boardId)
+            .<span class="fn">header</span>(<span class="st">"Authorization"</span>, <span class="st">"Bearer $viewerToken"</span>)
+            .<span class="fn">bodyValue</span>(<span class="ty">CreateTaskRequest</span>(title = <span class="st">"Sneaky Task"</span>))
+            .<span class="fn">exchange</span>()
+            .<span class="fn">expectStatus</span>().<span class="fn">isForbidden</span>
+    }
+}</code></pre>
+        </div>
+
+        <div class="section">
+            <h2>Flow Tests with Turbine (Phase 2)</h2>
+<pre><code><span class="kw">class</span> <span class="ty">BoardEventBusTest</span> {
+
+    <span class="kw">private val</span> bus = <span class="ty">BoardEventBus</span>()
+
+    <span class="an">@Test</span>
+    <span class="kw">fun</span> <span class="fn">`subscriber receives event when it is published to their board`</span>() = <span class="fn">runTest</span> {
+        <span class="kw">val</span> boardId = <span class="ty">UUID</span>.<span class="fn">randomUUID</span>()
+        <span class="kw">val</span> event = <span class="ty">BoardEvent</span>.<span class="ty">TaskCreated</span>(boardId = boardId, task = <span class="fn">aTaskResponse</span>())
+
+        bus.<span class="fn">subscribe</span>(boardId).<span class="fn">test</span> {  <span class="cm">// .test {} is Turbine's API</span>
+            bus.<span class="fn">publish</span>(event)
+
+            <span class="kw">val</span> received = <span class="fn">awaitItem</span>()
+            <span class="fn">assertThat</span>(received).<span class="fn">isEqualTo</span>(event)
+
+            <span class="fn">cancelAndIgnoreRemainingEvents</span>()
+        }
+    }
+
+    <span class="an">@Test</span>
+    <span class="kw">fun</span> <span class="fn">`subscriber does NOT receive events for a different board`</span>() = <span class="fn">runTest</span> {
+        <span class="kw">val</span> boardA = <span class="ty">UUID</span>.<span class="fn">randomUUID</span>()
+        <span class="kw">val</span> boardB = <span class="ty">UUID</span>.<span class="fn">randomUUID</span>()
+
+        bus.<span class="fn">subscribe</span>(boardA).<span class="fn">test</span> {
+            bus.<span class="fn">publish</span>(<span class="ty">BoardEvent</span>.<span class="ty">TaskCreated</span>(boardId = boardB, task = <span class="fn">aTaskResponse</span>()))
+
+            <span class="fn">expectNoEvents</span>()  <span class="cm">// boardA subscriber gets nothing</span>
+            <span class="fn">cancelAndIgnoreRemainingEvents</span>()
+        }
+    }
+}</code></pre>
+        </div>
+
+        <div class="section">
+            <h2>📋 TDD Approach for This Project</h2>
+            <div class="callout info">
+                <span class="icon">🧠</span>
+                <span><strong>Where TDD helps most here:</strong> service logic, domain rules, the event bus. <strong>Where TDD is harder:</strong> security config, controller wiring, database setup. Don't force TDD everywhere — use it where it adds clarity.</span>
+            </div>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-num">1</div>
+                    <div class="step-body">
+                        <h4>Write the test first for service methods</h4>
+                        <p>Before writing <code>TaskService.moveTask()</code>, write a test: "given a task in column A, when I move it to column B, the task's columnId should change and an event should be published." Watch it fail. Then implement.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-num">2</div>
+                    <div class="step-body">
+                        <h4>Write integration tests after controllers</h4>
+                        <p>Controllers are mostly wiring. Write the integration test after the controller is wired, but use it to verify the happy path and the key error cases (404, 403, 409).</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-num">3</div>
+                    <div class="step-body">
+                        <h4>Write Flow tests alongside the EventBus</h4>
+                        <p><code>BoardEventBus</code> is pure logic with no HTTP or DB. Write the Turbine tests at the same time you write the bus — it's one of the best TDD fits in this project.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- RESOURCES -->
+    <div id="tab-resources" class="tab-panel">
+
+        <div class="section">
+            <h2>📚 Resources</h2>
+
+            <h3>Must Read Before Starting (Phase 1)</h3>
+            <ul class="resource-list">
+                <li>
+                    <span class="icon">📖</span>
+                    <div>
+                        <a href="https://kotlinlang.org/docs/coroutines-basics.html" target="_blank">Kotlin Coroutines Basics</a>
+                        <span class="phase-tag p1">Phase 1</span>
+                        <div class="meta">Official JetBrains docs. Read "Basics" and "Cancellation and Timeouts". Skip "Channels" for now.</div>
+                    </div>
+                </li>
+                <li>
+                    <span class="icon">📖</span>
+                    <div>
+                        <a href="https://docs.spring.io/spring-framework/reference/languages/kotlin/coroutines.html" target="_blank">Spring Framework + Kotlin Coroutines</a>
+                        <span class="phase-tag p1">Phase 1</span>
+                        <div class="meta">How WebFlux and Spring Data work with suspend functions. Essential.</div>
+                    </div>
+                </li>
+                <li>
+                    <span class="icon">📖</span>
+                    <div>
+                        <a href="https://docs.spring.io/spring-data/relational/reference/r2dbc/getting-started.html" target="_blank">Spring Data R2DBC — Getting Started</a>
+                        <span class="phase-tag p1">Phase 1</span>
+                        <div class="meta">How entities and repositories differ from JPA. Focus on the repository and entity mapping sections.</div>
+                    </div>
+                </li>
+                <li>
+                    <span class="icon">📖</span>
+                    <div>
+                        <a href="https://docs.spring.io/spring-security/reference/reactive/index.html" target="_blank">Spring Security — Reactive</a>
+                        <span class="phase-tag p1">Phase 1</span>
+                        <div class="meta">The reactive security docs. Read the "Authentication" and "Authorization" sections. This is the hardest read on the list.</div>
+                    </div>
+                </li>
+                <li>
+                    <span class="icon">📖</span>
+                    <div>
+                        <a href="https://github.com/jwtk/jjwt?tab=readme-ov-file#quickstart" target="_blank">JJWT Library — Quickstart</a>
+                        <span class="phase-tag p1">Phase 1</span>
+                        <div class="meta">The JWT library you'll use. The README has everything you need to generate and validate tokens.</div>
+                    </div>
+                </li>
+            </ul>
+
+            <h3 style="margin-top:20px;">Read When You Get to Phase 2</h3>
+            <ul class="resource-list">
+                <li>
+                    <span class="icon">📖</span>
+                    <div>
+                        <a href="https://kotlinlang.org/docs/flow.html" target="_blank">Kotlin Flow — Official Docs</a>
+                        <span class="phase-tag p2">Phase 2</span>
+                        <div class="meta">Everything about Flow. Focus on the "SharedFlow and StateFlow" section specifically.</div>
+                    </div>
+                </li>
+                <li>
+                    <span class="icon">📖</span>
+                    <div>
+                        <a href="https://docs.spring.io/spring-framework/reference/web/webflux/ann-rest-exceptions.html" target="_blank">WebFlux Server-Sent Events</a>
+                        <span class="phase-tag p2">Phase 2</span>
+                        <div class="meta">How to return a Flow as an SSE stream from a controller. Short but important.</div>
+                    </div>
+                </li>
+                <li>
+                    <span class="icon">📦</span>
+                    <div>
+                        <a href="https://github.com/cashapp/turbine" target="_blank">Turbine — Flow Testing Library</a>
+                        <span class="phase-tag p2">Phase 2</span>
+                        <div class="meta">The go-to library for testing Kotlin Flows. The README is the documentation — it's short and clear.</div>
+                    </div>
+                </li>
+            </ul>
+
+            <h3 style="margin-top:20px;">Testing</h3>
+            <ul class="resource-list">
+                <li>
+                    <span class="icon">📖</span>
+                    <div>
+                        <a href="https://mockk.io/" target="_blank">MockK Documentation</a>
+                        <span class="phase-tag p1">Phase 1</span>
+                        <div class="meta">The Kotlin mocking library. Specifically look at the coroutines section for coEvery, coVerify.</div>
+                    </div>
+                </li>
+                <li>
+                    <span class="icon">📖</span>
+                    <div>
+                        <a href="https://docs.spring.io/spring-framework/reference/testing/webtestclient.html" target="_blank">WebTestClient — Spring Docs</a>
+                        <span class="phase-tag p1">Phase 1</span>
+                        <div class="meta">The reactive replacement for MockMvc. Used for integration testing controllers.</div>
+                    </div>
+                </li>
+                <li>
+                    <span class="icon">📦</span>
+                    <div>
+                        <a href="https://testcontainers.com/guides/testing-spring-boot-kotlin-with-testcontainers/" target="_blank">Testcontainers + Spring Boot + Kotlin Guide</a>
+                        <span class="phase-tag p1">Phase 1</span>
+                        <div class="meta">How to spin up a real PostgreSQL database in your tests. Follows the exact setup you'll use.</div>
+                    </div>
+                </li>
+                <li>
+                    <span class="icon">📖</span>
+                    <div>
+                        <a href="https://kotlinlang.org/api/kotlinx.coroutines/kotlinx-coroutines-test/" target="_blank">kotlinx-coroutines-test (runTest)</a>
+                        <span class="phase-tag p1">Phase 1</span>
+                        <div class="meta">The test runner for suspend functions. You need this to call suspend functions inside @Test methods.</div>
+                    </div>
+                </li>
+            </ul>
+
+            <h3 style="margin-top:20px;">Phase 3 & 4</h3>
+            <ul class="resource-list">
+                <li>
+                    <span class="icon">📖</span>
+                    <div>
+                        <a href="https://docs.spring.io/spring-data/relational/reference/r2dbc/entity-persistence.html" target="_blank">R2DBC DatabaseClient — Dynamic Queries</a>
+                        <span class="phase-tag p3">Phase 3</span>
+                        <div class="meta">How to build SQL queries dynamically when you don't have JPA's Specification API.</div>
+                    </div>
+                </li>
+                <li>
+                    <span class="icon">📖</span>
+                    <div>
+                        <a href="https://docs.spring.io/spring-data/redis/reference/redis/redis-reactive.html" target="_blank">Spring Data Redis — Reactive</a>
+                        <span class="phase-tag p4">Phase 4</span>
+                        <div class="meta">ReactiveRedisTemplate, pub/sub with reactive Redis. Read when you start Phase 4.</div>
+                    </div>
+                </li>
+            </ul>
+
+            <h3 style="margin-top:20px;">Good to Know (Browse When Curious)</h3>
+            <ul class="resource-list">
+                <li>
+                    <span class="icon">📝</span>
+                    <div>
+                        <a href="https://www.baeldung.com/spring-webflux-kotlin" target="_blank">Baeldung — Spring WebFlux with Kotlin</a>
+                        <div class="meta">Baeldung's usual style — practical examples. Good supplement to official docs.</div>
+                    </div>
+                </li>
+                <li>
+                    <span class="icon">📝</span>
+                    <div>
+                        <a href="https://spring.io/guides/tutorials/spring-security-and-angular-js" target="_blank">Spring Security Architecture (conceptual)</a>
+                        <div class="meta">Understanding the filter chain and security context conceptually before you implement it.</div>
+                    </div>
+                </li>
+                <li>
+                    <span class="icon">🎥</span>
+                    <div>
+                        <a href="https://www.youtube.com/results?search_query=spring+webflux+kotlin+coroutines+tutorial" target="_blank">YouTube: Spring WebFlux + Kotlin Coroutines</a>
+                        <div class="meta">Search this and find a recent video (2023+). Seeing someone build it helps before you read the docs.</div>
+                    </div>
+                </li>
+            </ul>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let scrollToTopEnabled = true;
+
+    function toggleScroll() {
+        scrollToTopEnabled = !scrollToTopEnabled;
+        const toggle = document.querySelector('.scroll-toggle');
+        const label = document.getElementById('scrollLabel');
+        label.textContent = scrollToTopEnabled ? 'Scroll to top: ON' : 'Scroll to top: OFF';
+        toggle.classList.toggle('off', !scrollToTopEnabled);
+    }
+
+    function showTab(name, btn) {
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('nav.tabs button').forEach(b => b.classList.remove('active'));
+        document.getElementById('tab-' + name).classList.add('active');
+        btn.classList.add('active');
+        if (scrollToTopEnabled) {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }
+</script>
+
+</body>
+</html>
