@@ -1,4 +1,4 @@
-package org.example.taskboard.user
+package org.example.taskboard.auth
 
 import org.springframework.data.repository.kotlin.CoroutineCrudRepository
 import java.util.UUID

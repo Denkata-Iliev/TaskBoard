@@ -1,4 +1,4 @@
-package org.example.taskboard.user
+package org.example.taskboard.auth
 
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank

@@ -1,6 +1,6 @@
-package org.example.taskboard.user
+package org.example.taskboard.auth
 
-interface UserService {
+interface AuthService {
     suspend fun register(request: AuthRequest): UserResponse
     suspend fun login(request: AuthRequest): String
 }

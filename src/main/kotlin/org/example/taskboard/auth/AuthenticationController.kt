@@ -1,4 +1,4 @@
-package org.example.taskboard.user
+package org.example.taskboard.auth
 
 import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
@@ -9,10 +9,10 @@ import org.springframework.web.bind.annotation.RestController
 
 @RestController
 @RequestMapping("/auth")
-class AuthenticationController(private val userService: UserService) {
+class AuthenticationController(private val authService: AuthService) {
     @PostMapping("/register")
     suspend fun register(@RequestBody @Valid request: AuthRequest): ResponseEntity<UserResponse> {
-        val user = userService.register(request)
+        val user = authService.register(request)
         return ResponseEntity.ok(user)
     }
 }

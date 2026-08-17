@@ -1,16 +1,17 @@
-package org.example.taskboard.user
+package org.example.taskboard.auth
 
+import org.example.taskboard.exceptions.ConflictException
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 
 @Service
-class UserServiceImpl(
+class AuthServiceImpl(
     private val repository: UserRepository,
     private val encoder: PasswordEncoder
-) : UserService {
+) : AuthService {
     override suspend fun register(request: AuthRequest): UserResponse {
         if (repository.existsByEmail(request.email)) {
-            throw Exception("User with email ${request.email} already exists.")
+            throw ConflictException("User with email ${request.email} already exists.")
         }
 
         val user = BoardUser(
