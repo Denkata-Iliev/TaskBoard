@@ -1,5 +1,6 @@
 package org.example.taskboard.auth
 
+import org.example.taskboard.exceptions.BadCredentialsException
 import org.example.taskboard.exceptions.ConflictException
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
@@ -24,7 +25,13 @@ class AuthServiceImpl(
         return dbUser.toResponse()
     }
 
-    override suspend fun login(request: AuthRequest): String {
-        TODO("Not yet implemented")
+    override suspend fun login(request: AuthRequest): JwtResponse {
+        val user = repository.findByEmail(request.email) ?: throw BadCredentialsException("Invalid email or password.")
+
+        if (!encoder.matches(request.password, user.passwordHash)) {
+            throw BadCredentialsException("Invalid email or password.")
+        }
+
+        return JwtResponse("jwt")
     }
 }

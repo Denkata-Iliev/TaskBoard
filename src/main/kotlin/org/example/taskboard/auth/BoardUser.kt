@@ -41,3 +41,5 @@ data class AuthRequest(
     @Pattern(regexp = "^(?=.*\\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[a-zA-Z])(?=.*[!@#$%^&*()\\-_+=]).{8,20}$", message = "invalid password")
     val password: String
 )
+
+data class JwtResponse(val jwt: String)

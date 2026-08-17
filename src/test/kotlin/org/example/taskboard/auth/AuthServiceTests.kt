@@ -2,9 +2,12 @@ package org.example.taskboard.auth
 
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
+import org.example.taskboard.exceptions.BadCredentialsException
 import org.example.taskboard.exceptions.ConflictException
+import org.example.taskboard.fixtures.aUser
 import org.example.taskboard.fixtures.anAuthRequest
 import org.springframework.security.crypto.password.PasswordEncoder
 import java.util.UUID
@@ -29,7 +32,7 @@ class AuthServiceTests {
     @Test
     fun `when email does not exist register saves user`() = runTest {
         coEvery { userRepository.existsByEmail(any()) } returns false
-        coEvery { passwordEncoder.encode(any()) } returns "hashed_password"
+        every { passwordEncoder.encode(any()) } returns "hashed_password"
 
         val id = UUID.randomUUID()
         coEvery { userRepository.save(any<BoardUser>()) } answers { firstArg<BoardUser>().copy(id = id) }
@@ -45,5 +48,32 @@ class AuthServiceTests {
                 it.email == req.email && it.passwordHash == "hashed_password" && it.passwordHash != req.password
             })
         }
+    }
+
+    @Test
+    fun `when email does not exist, login throws bad credentials exception`() = runTest {
+        coEvery { userRepository.findByEmail(any()) } returns null
+
+        assertFailsWith<BadCredentialsException> { authService.login(anAuthRequest()) }
+    }
+
+    @Test
+    fun `when password does not match, login throws bad credentials exception`() = runTest {
+        coEvery { userRepository.findByEmail(any()) } returns aUser()
+
+        every { passwordEncoder.matches(any(), any()) } returns false
+
+        assertFailsWith<BadCredentialsException> { authService.login(anAuthRequest()) }
+    }
+
+    @Test
+    fun `when email and password are correct, login returns jwt`() = runTest {
+        coEvery { userRepository.findByEmail(any()) } returns aUser()
+
+        every { passwordEncoder.matches(any(), any()) } returns true
+
+        val response = authService.login(anAuthRequest())
+
+        assertEquals("jwt", response.jwt)
     }
 }

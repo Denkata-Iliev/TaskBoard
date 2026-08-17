@@ -15,4 +15,10 @@ class AuthenticationController(private val authService: AuthService) {
         val user = authService.register(request)
         return ResponseEntity.ok(user)
     }
+
+    @PostMapping("/login")
+    suspend fun login(@RequestBody @Valid request: AuthRequest): ResponseEntity<JwtResponse> {
+        val response = authService.login(request)
+        return ResponseEntity.ok(response)
+    }
 }
