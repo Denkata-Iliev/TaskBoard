@@ -11,3 +11,8 @@ spring:
     url: jdbc:postgresql://localhost:5432/taskboard
     user: taskboard
     password: password
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration: ${JWT_EXP}

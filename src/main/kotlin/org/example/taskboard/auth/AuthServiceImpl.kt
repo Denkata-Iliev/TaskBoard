@@ -1,5 +1,6 @@
 package org.example.taskboard.auth
 
+import org.example.taskboard.auth.jwt.JwtService
 import org.example.taskboard.exceptions.BadCredentialsException
 import org.example.taskboard.exceptions.ConflictException
 import org.springframework.security.crypto.password.PasswordEncoder
@@ -8,7 +9,8 @@ import org.springframework.stereotype.Service
 @Service
 class AuthServiceImpl(
     private val repository: UserRepository,
-    private val encoder: PasswordEncoder
+    private val encoder: PasswordEncoder,
+    private val jwtService: JwtService
 ) : AuthService {
     override suspend fun register(request: AuthRequest): UserResponse {
         if (repository.existsByEmail(request.email)) {
@@ -32,6 +34,7 @@ class AuthServiceImpl(
             throw BadCredentialsException("Invalid email or password.")
         }
 
-        return JwtResponse("jwt")
+        val jwt = jwtService.generateToken(user)
+        return JwtResponse(jwt)
     }
 }
