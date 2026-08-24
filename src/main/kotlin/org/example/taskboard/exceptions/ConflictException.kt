@@ -1,3 +1,3 @@
 package org.example.taskboard.exceptions
 
-class ConflictException(message: String) : RuntimeException(message)
+class ConflictException(override val message: String) : RuntimeException(message)

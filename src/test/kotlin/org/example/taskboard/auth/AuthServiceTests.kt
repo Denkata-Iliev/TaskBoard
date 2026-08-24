@@ -7,7 +7,6 @@ import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.example.taskboard.auth.jwt.JwtService
-import org.example.taskboard.exceptions.BadCredentialsException
 import org.example.taskboard.exceptions.ConflictException
 import org.example.taskboard.fixtures.aUser
 import org.example.taskboard.fixtures.anAuthRequest

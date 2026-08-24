@@ -49,6 +49,15 @@ dependencies {
     implementation("io.jsonwebtoken:jjwt-api:0.13.0")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.13.0")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.13.0")
+
+    // Testcontainers for integration testing with real containers spun up
+    testImplementation("org.testcontainers:r2dbc:1.21.4")
+    testImplementation("org.testcontainers:testcontainers:2.0.5")
+    testImplementation("org.springframework.boot:spring-boot-testcontainers")
+    testImplementation("org.testcontainers:testcontainers-postgresql:2.0.5")
+
+    testImplementation("org.junit.jupiter:junit-jupiter:5.8.1")
+    testImplementation("org.testcontainers:testcontainers-junit-jupiter:2.0.5")
 }
 
 kotlin {

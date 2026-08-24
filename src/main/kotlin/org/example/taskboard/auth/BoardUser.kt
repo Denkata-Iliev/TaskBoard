@@ -33,12 +33,14 @@ fun BoardUser.toResponse() = UserResponse(
 )
 
 data class AuthRequest(
-    @NotBlank(message = "not blank email")
-    @Email(message = "email validation error")
+    @NotBlank(message = AuthErrorMessages.EMAIL_MUST_NOT_BE_EMPTY)
+    @Email(message = AuthErrorMessages.EMAIL_MUST_BE_VALID)
     val email: String,
 
-    @NotBlank(message = "not blank password")
-    @Pattern(regexp = "^(?=.*\\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[a-zA-Z])(?=.*[!@#$%^&*()\\-_+=]).{8,20}$", message = "invalid password")
+    @Pattern(
+        regexp = "^(?=.*\\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[a-zA-Z])(?=.*[!@#$%^&*()\\-_+=]).{8,20}$",
+        message = AuthErrorMessages.PASSWORD_REQUIREMENTS
+    )
     val password: String
 )
 

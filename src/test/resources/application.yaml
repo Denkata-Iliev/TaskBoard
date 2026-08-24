@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: "Test Application Name"
+
+app:
+  jwt:
+    secret: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    expiration: 3600000

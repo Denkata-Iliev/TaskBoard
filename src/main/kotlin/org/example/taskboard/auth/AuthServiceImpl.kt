@@ -1,7 +1,6 @@
 package org.example.taskboard.auth
 
 import org.example.taskboard.auth.jwt.JwtService
-import org.example.taskboard.exceptions.BadCredentialsException
 import org.example.taskboard.exceptions.ConflictException
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
@@ -14,7 +13,7 @@ class AuthServiceImpl(
 ) : AuthService {
     override suspend fun register(request: AuthRequest): UserResponse {
         if (repository.existsByEmail(request.email)) {
-            throw ConflictException("User with email ${request.email} already exists.")
+            throw ConflictException(String.format(AuthErrorMessages.EMAIL_ALREADY_EXISTS, request.email))
         }
 
         val user = BoardUser(
@@ -28,10 +27,10 @@ class AuthServiceImpl(
     }
 
     override suspend fun login(request: AuthRequest): JwtResponse {
-        val user = repository.findByEmail(request.email) ?: throw BadCredentialsException("Invalid email or password.")
+        val user = repository.findByEmail(request.email) ?: throw BadCredentialsException(AuthErrorMessages.INVALID_EMAIL_OR_PASSWORD)
 
         if (!encoder.matches(request.password, user.passwordHash)) {
-            throw BadCredentialsException("Invalid email or password.")
+            throw BadCredentialsException(AuthErrorMessages.INVALID_EMAIL_OR_PASSWORD)
         }
 
         val jwt = jwtService.generateToken(user)

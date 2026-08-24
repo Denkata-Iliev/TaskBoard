@@ -1,6 +1,7 @@
 package org.example.taskboard.auth
 
 import jakarta.validation.Valid
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -13,11 +14,11 @@ class AuthenticationController(private val authService: AuthService) {
     @PostMapping("/register")
     suspend fun register(@RequestBody @Valid request: AuthRequest): ResponseEntity<UserResponse> {
         val user = authService.register(request)
-        return ResponseEntity.ok(user)
+        return ResponseEntity.status(HttpStatus.CREATED).body(user)
     }
 
     @PostMapping("/login")
-    suspend fun login(@RequestBody @Valid request: AuthRequest): ResponseEntity<JwtResponse> {
+    suspend fun login(@RequestBody request: AuthRequest): ResponseEntity<JwtResponse> {
         val response = authService.login(request)
         return ResponseEntity.ok(response)
     }
