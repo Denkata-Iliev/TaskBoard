@@ -32,7 +32,7 @@ fun BoardUser.toResponse() = UserResponse(
     createdAt = this.createdAt
 )
 
-data class AuthRequest(
+data class RegisterRequest(
     @NotBlank(message = AuthErrorMessages.EMAIL_MUST_NOT_BE_EMPTY)
     @Email(message = AuthErrorMessages.EMAIL_MUST_BE_VALID)
     val email: String,
@@ -41,6 +41,14 @@ data class AuthRequest(
         regexp = "^(?=.*\\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[a-zA-Z])(?=.*[!@#$%^&*()\\-_+=]).{8,20}$",
         message = AuthErrorMessages.PASSWORD_REQUIREMENTS
     )
+    val password: String
+)
+
+data class LoginRequest(
+    @NotBlank(message = AuthErrorMessages.EMAIL_MUST_NOT_BE_EMPTY)
+    val email: String,
+
+    @NotBlank(message = AuthErrorMessages.PASSWORD_MUST_NOT_BE_EMPTY)
     val password: String
 )
 

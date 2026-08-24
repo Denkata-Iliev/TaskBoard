@@ -11,7 +11,7 @@ class AuthServiceImpl(
     private val encoder: PasswordEncoder,
     private val jwtService: JwtService
 ) : AuthService {
-    override suspend fun register(request: AuthRequest): UserResponse {
+    override suspend fun register(request: RegisterRequest): UserResponse {
         if (repository.existsByEmail(request.email)) {
             throw ConflictException(String.format(AuthErrorMessages.EMAIL_ALREADY_EXISTS, request.email))
         }
@@ -26,7 +26,7 @@ class AuthServiceImpl(
         return dbUser.toResponse()
     }
 
-    override suspend fun login(request: AuthRequest): JwtResponse {
+    override suspend fun login(request: LoginRequest): JwtResponse {
         val user = repository.findByEmail(request.email) ?: throw BadCredentialsException(AuthErrorMessages.INVALID_EMAIL_OR_PASSWORD)
 
         if (!encoder.matches(request.password, user.passwordHash)) {

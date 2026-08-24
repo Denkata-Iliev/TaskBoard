@@ -12,13 +12,13 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/auth")
 class AuthenticationController(private val authService: AuthService) {
     @PostMapping("/register")
-    suspend fun register(@RequestBody @Valid request: AuthRequest): ResponseEntity<UserResponse> {
+    suspend fun register(@RequestBody @Valid request: RegisterRequest): ResponseEntity<UserResponse> {
         val user = authService.register(request)
         return ResponseEntity.status(HttpStatus.CREATED).body(user)
     }
 
     @PostMapping("/login")
-    suspend fun login(@RequestBody request: AuthRequest): ResponseEntity<JwtResponse> {
+    suspend fun login(@RequestBody @Valid request: LoginRequest): ResponseEntity<JwtResponse> {
         val response = authService.login(request)
         return ResponseEntity.ok(response)
     }

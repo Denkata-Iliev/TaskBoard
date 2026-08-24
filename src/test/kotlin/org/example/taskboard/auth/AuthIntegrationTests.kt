@@ -1,6 +1,7 @@
 package org.example.taskboard.auth
 
-import org.example.taskboard.fixtures.anAuthRequest
+import org.example.taskboard.fixtures.aLoginRequest
+import org.example.taskboard.fixtures.aRegisterRequest
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -25,7 +26,7 @@ class AuthIntegrationTests(@Autowired private val client: WebTestClient) {
 
     @Test
     fun `with valid email and password on register, user is saved in db`() {
-        val req = anAuthRequest()
+        val req = aRegisterRequest()
         client.post()
             .uri("/auth/register")
             .bodyValue(req)
@@ -38,7 +39,7 @@ class AuthIntegrationTests(@Autowired private val client: WebTestClient) {
 
     @Test
     fun `already existing email on register returns conflict error`() {
-        val req = anAuthRequest(email = "already@exists.com")
+        val req = aRegisterRequest(email = "already@exists.com")
         client.post()
             .uri("/auth/register")
             .bodyValue(req)
@@ -61,16 +62,17 @@ class AuthIntegrationTests(@Autowired private val client: WebTestClient) {
 
     @Test
     fun `valid email and password on login return jwt`() {
-        val req = anAuthRequest(email = "login@test.test", password = "Password123#")
+        val registerRequest = aRegisterRequest(email = "login@test.test", password = "Password123#")
         client.post()
             .uri("/auth/register")
-            .bodyValue(req)
+            .bodyValue(registerRequest)
             .exchange()
             .expectStatus().isCreated
 
+        val loginRequest = aLoginRequest(email = registerRequest.email, password = registerRequest.password)
         client.post()
             .uri("/auth/login")
-            .bodyValue(req)
+            .bodyValue(loginRequest)
             .exchange()
             .expectStatus().isOk
             .expectBody()
@@ -79,7 +81,7 @@ class AuthIntegrationTests(@Autowired private val client: WebTestClient) {
 
     @Test
     fun `invalid email and password on login returns bad-credentials error`() {
-        val req = anAuthRequest(email = "invalid@email.com", password = "invalid")
+        val req = aLoginRequest(email = "invalid@email.com", password = "invalid")
         client.post()
             .uri("/auth/login")
             .bodyValue(req)
@@ -93,7 +95,7 @@ class AuthIntegrationTests(@Autowired private val client: WebTestClient) {
     @Test
     fun `empty email on register returns not-empty error`() {
         assertValidationError(
-            request = anAuthRequest(email = ""),
+            request = aRegisterRequest(email = ""),
             field = "email",
             errorMessage = AuthErrorMessages.EMAIL_MUST_NOT_BE_EMPTY
         )
@@ -102,7 +104,7 @@ class AuthIntegrationTests(@Autowired private val client: WebTestClient) {
     @Test
     fun `malformed email on register returns format error`() {
         assertValidationError(
-            request = anAuthRequest(email = "invalid"),
+            request = aRegisterRequest(email = "invalid"),
             field = "email",
             errorMessage = AuthErrorMessages.EMAIL_MUST_BE_VALID
         )
@@ -111,13 +113,13 @@ class AuthIntegrationTests(@Autowired private val client: WebTestClient) {
     @Test
     fun `empty or invalid password on register returns password error`() {
         assertValidationError(
-            request = anAuthRequest(password = ""),
+            request = aRegisterRequest(password = ""),
             field = "password",
             errorMessage = AuthErrorMessages.PASSWORD_REQUIREMENTS
         )
 
         assertValidationError(
-            request = anAuthRequest(password = "invalid"),
+            request = aRegisterRequest(password = "invalid"),
             field = "password",
             errorMessage = AuthErrorMessages.PASSWORD_REQUIREMENTS
         )
@@ -125,7 +127,7 @@ class AuthIntegrationTests(@Autowired private val client: WebTestClient) {
 
     @Test
     fun `invalid email and password on register both return respective errors`() {
-        val req = anAuthRequest(email = "invalid", password = "invalid")
+        val req = aRegisterRequest(email = "invalid", password = "invalid")
         client.post()
             .uri("/auth/register")
             .bodyValue(req)
@@ -138,7 +140,7 @@ class AuthIntegrationTests(@Autowired private val client: WebTestClient) {
             .jsonPath("$.errors[1].fieldErrors[0]").isEqualTo(AuthErrorMessages.PASSWORD_REQUIREMENTS)
     }
 
-    private fun assertValidationError(request: AuthRequest, field: String, errorMessage: String) {
+    private fun assertValidationError(request: RegisterRequest, field: String, errorMessage: String) {
         client.post()
             .uri("/auth/register")
             .bodyValue(request)
